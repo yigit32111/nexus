@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "../utils/supabase/client";
 import {
   Activity, AudioLines, Brain, Check, ChevronDown, CirclePlus, Command,
   Download, Gauge, Menu, Mic, MoreHorizontal, PanelLeftClose, Plus,
   Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, X, Zap,
-  MessageSquare, SlidersHorizontal, Database, RotateCcw, Search
+  MessageSquare, SlidersHorizontal, Database, RotateCcw, Search, LogOut
 } from "lucide-react";
 
 type Message = { role: "user" | "assistant"; content: string };
@@ -25,6 +27,11 @@ function newChat(): Chat {
 function titleFrom(text: string) { return text.trim().slice(0, 34) || "Yeni sohbet"; }
 
 export default function Home() {
+  const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
+  const [userId, setUserId] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [authLoading, setAuthLoading] = useState(true);
   const [chats, setChats] = useState<Chat[]>([]);
   const [active, setActive] = useState("");
   const [input, setInput] = useState("");
@@ -43,19 +50,74 @@ export default function Home() {
   const activeChat = chats.find(c => c.id === active);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORE);
-      if (stored) { const parsed: Chat[] = JSON.parse(stored); if (parsed.length) { setChats(parsed); setActive(parsed[0].id); } else { const c = newChat(); setChats([c]); setActive(c.id); } }
-      else { const c = newChat(); setChats([c]); setActive(c.id); }
-      setPrefs({ ...defaults, ...JSON.parse(localStorage.getItem(PREFS) || "{}") });
-    } catch { const c = newChat(); setChats([c]); setActive(c.id); }
-    setReady(true);
-    const timer = window.setTimeout(() => setBooting(false), 1450);
-    fetch("/api/status").then(r => r.json()).then(setModelInfo).catch(() => setModelInfo({ model: "Bilinmiyor", provider: "Bağlantı kontrol edilemedi", configured: false }));
-    return () => window.clearTimeout(timer);
-  }, []);
-  useEffect(() => { if (ready) localStorage.setItem(STORE, JSON.stringify(chats)); }, [chats, ready]);
-  useEffect(() => { if (ready) localStorage.setItem(PREFS, JSON.stringify(prefs)); }, [prefs, ready]);
+    let cancelled = false;
+    let timer: number | undefined;
+
+    async function initialize() {
+      const { data, error } = await supabase.auth.getUser();
+      if (cancelled) return;
+
+      if (error || !data.user) {
+        setAuthLoading(false);
+        router.replace("/login");
+        return;
+      }
+
+      const id = data.user.id;
+      setUserId(id);
+      setUserEmail(data.user.email ?? "");
+
+      try {
+        const stored = localStorage.getItem(`${STORE}_${id}`);
+        if (stored) {
+          const parsed: Chat[] = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length) {
+            setChats(parsed);
+            setActive(parsed[0].id);
+          } else {
+            const c = newChat();
+            setChats([c]);
+            setActive(c.id);
+          }
+        } else {
+          const c = newChat();
+          setChats([c]);
+          setActive(c.id);
+        }
+        setPrefs({ ...defaults, ...JSON.parse(localStorage.getItem(`${PREFS}_${id}`) || "{}") });
+      } catch {
+        const c = newChat();
+        setChats([c]);
+        setActive(c.id);
+        setPrefs(defaults);
+      }
+
+      setReady(true);
+      setAuthLoading(false);
+      timer = window.setTimeout(() => setBooting(false), 1450);
+      fetch("/api/status")
+        .then(r => r.json())
+        .then(setModelInfo)
+        .catch(() => setModelInfo({
+          model: "Bilinmiyor",
+          provider: "Bağlantı kontrol edilemedi",
+          configured: false
+        }));
+    }
+
+    initialize();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [router, supabase]);
+
+  useEffect(() => {
+    if (ready && userId) localStorage.setItem(`${STORE}_${userId}`, JSON.stringify(chats));
+  }, [chats, ready, userId]);
+  useEffect(() => {
+    if (ready && userId) localStorage.setItem(`${PREFS}_${userId}`, JSON.stringify(prefs));
+  }, [prefs, ready, userId]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [activeChat?.messages, busy]);
 
   const sortedChats = useMemo(() => [...chats].sort((a,b)=>b.updatedAt-a.updatedAt).filter(c => c.title.toLowerCase().includes(search.toLowerCase())), [chats, search]);
@@ -76,6 +138,14 @@ export default function Home() {
     } catch(e:unknown) { const message=e instanceof Error?e.message:"Bilinmeyen hata"; patchMessages(id,[...messages,{role:"assistant",content:`Bağlantı hatası: ${message}\n\nAPI ayarlarını (.env.local) ve sağlayıcı limitlerini kontrol et.`}]); }
     finally {setBusy(false);}
   }
+  async function signOut() {
+    await supabase.auth.signOut();
+    setReady(false);
+    setUserId("");
+    router.replace("/login");
+    router.refresh();
+  }
+
   function dictate() {
     const w=window as Window & { SpeechRecognition?: new()=>any; webkitSpeechRecognition?: new()=>any }; const Speech=w.SpeechRecognition||w.webkitSpeechRecognition;
     if(!Speech){setStatus("Bu tarayıcı sesli yazmayı desteklemiyor.");return;}
@@ -87,6 +157,15 @@ export default function Home() {
     const url=URL.createObjectURL(blob); const a=document.createElement("a");a.href=url;a.download=`nexus-${activeChat.title.replace(/\W+/g,"-")}.txt`;a.click();URL.revokeObjectURL(url);
   }
 
+  if (authLoading || !ready || !userId) {
+    return <main className="app-shell"><div className="boot-screen">
+      <div className="boot-brand">
+        <div className="boot-word">NEXUS<span>AI</span></div>
+        <div className="boot-loading">OTURUM KONTROL EDİLİYOR <span>●</span></div>
+      </div>
+    </div></main>;
+  }
+
   return <main className="app-shell">
     {booting && <div className="boot-screen"><div className="boot-grid"/><div className="boot-brand"><div className="boot-orb"><div/><div/><Sparkles size={29}/></div><div className="boot-word">NEXUS<span>AI</span></div><div className="boot-sub">PERSONAL INTELLIGENCE SYSTEM</div><div className="boot-progress"><i/></div><div className="boot-loading">SİSTEM BAŞLATILIYOR <span>●</span></div></div></div>}
     <aside className={`sidebar ${sidebar?"open":"closed"}`}>
@@ -96,7 +175,7 @@ export default function Home() {
       <div className="search-box"><Search size={14}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Sohbetlerde ara"/></div>
       <div className="history-label history-title">SON SOHBETLER</div>
       <div className="history-list">{sortedChats.map(c=><div key={c.id} className={`history-item ${active===c.id?"selected":""}`}><button className="history-select" onClick={()=>{setActive(c.id);if(window.innerWidth<760)setSidebar(false);}}><MessageSquare size={14}/><span>{c.title}</span></button><button className="tiny-btn" onClick={()=>deleteChat(c.id)} title="Sohbeti sil"><Trash2 size={13}/></button></div>)}</div>
-      <div className="sidebar-bottom"><div className="provider-card"><div className="provider-icon"><Zap size={15}/></div><div className="provider-copy"><b>{modelInfo.provider}</b><small>{modelInfo.model}</small></div><span className={`provider-dot ${modelInfo.configured?"":"off"}`}/></div><div className="user-card"><div className="avatar">N</div><div><b>Personal workspace</b><small>Yerel profil</small></div><button className="icon-btn" onClick={()=>setSettings(true)}><Settings size={17}/></button></div></div>
+      <div className="sidebar-bottom"><div className="provider-card"><div className="provider-icon"><Zap size={15}/></div><div className="provider-copy"><b>{modelInfo.provider}</b><small>{modelInfo.model}</small></div><span className={`provider-dot ${modelInfo.configured?"":"off"}`}/></div><div className="user-card"><div className="avatar">N</div><div className="user-copy"><b>{userEmail || "NEXUS kullanıcısı"}</b><small>Hesabın</small></div><button className="icon-btn" onClick={()=>setSettings(true)} title="Ayarlar"><Settings size={17}/></button><button className="icon-btn" onClick={signOut} title="Çıkış yap"><LogOut size={17}/></button></div></div>
     </aside>
     <section className="main">
       <header className="topbar"><button className="icon-btn" onClick={()=>setSidebar(!sidebar)} aria-label="Menü"><Menu size={19}/></button><div className="top-title"><span className="status-dot"/><b>NEXUS AI</b><span className="model-pill">{modelInfo.model}</span></div><div className="top-actions"><div className="secure-label"><ShieldCheck size={13}/> GÜVENLİ OTURUM</div><button className="icon-btn" onClick={exportChat} title="Sohbeti dışa aktar"><Download size={17}/></button><button className="icon-btn" onClick={()=>setSettings(true)} title="Ayarlar"><SlidersHorizontal size={18}/></button></div></header>
@@ -109,7 +188,7 @@ export default function Home() {
     {settings&&<div className="modal-backdrop" onClick={()=>setSettings(false)}><div className="settings-modal" onClick={e=>e.stopPropagation()}><div className="settings-top"><div><div className="settings-kicker">CONTROL CENTER</div><h2>NEXUS ayarları</h2><p>Deneyimini kendi çalışma tarzına göre düzenle.</p></div><button className="icon-btn close-settings" onClick={()=>setSettings(false)}><X size={18}/></button></div><div className="settings-layout"><nav className="settings-nav"><button className={settingsTab==="general"?"active":""} onClick={()=>setSettingsTab("general")}><SlidersHorizontal size={16}/> Genel</button><button className={settingsTab==="personal"?"active":""} onClick={()=>setSettingsTab("personal")}><Brain size={16}/> Kişiselleştirme</button><button className={settingsTab==="system"?"active":""} onClick={()=>setSettingsTab("system")}><Activity size={16}/> Sistem</button></nav><div className="settings-content">
       {settingsTab==="general"&&<><div className="section-title">YANIT TERCİHLERİ</div><label className="setting-label">Cevap uzunluğu</label><div className="choice-row"><button className={prefs.style==="concise"?"chosen":""} onClick={()=>setPrefs(p=>({...p,style:"concise"}))}>Kısa</button><button className={prefs.style==="balanced"?"chosen":""} onClick={()=>setPrefs(p=>({...p,style:"balanced"}))}>Dengeli</button><button className={prefs.style==="detailed"?"chosen":""} onClick={()=>setPrefs(p=>({...p,style:"detailed"}))}>Detaylı</button></div><div className="setting-divider"/><div className="setting-label-row"><label className="setting-label">Yaratıcılık seviyesi</label><b>{prefs.temperature}%</b></div><input className="range" type="range" min="0" max="100" value={prefs.temperature} onChange={e=>setPrefs(p=>({...p,temperature:Number(e.target.value)}))}/><div className="range-labels"><span>Daha tutarlı</span><span>Daha yaratıcı</span></div><div className="setting-divider"/><div className="setting-label">Sesli yanıt</div><button className={`toggle-row ${voice?"enabled":""}`} onClick={()=>setVoice(!voice)}><span><Volume2 size={17}/> NEXUS yanıtlarını sesli okusun</span><i/></button></>}
       {settingsTab==="personal"&&<><div className="section-title">NEXUS HAFIZASI</div><label className="setting-label">Kişisel bağlam</label><textarea className="memory-input" value={prefs.memory} onChange={e=>setPrefs(p=>({...p,memory:e.target.value}))} placeholder="NEXUS'un bilmesini istediğin tercihleri, hedeflerini veya çalışma şeklini yaz..."/><p className="modal-note"><Database size={13}/> Bu bilgiler bu tarayıcıda saklanır ve yanıt oluşturulurken bağlam olarak kullanılır. Farklı cihazlarla otomatik senkronize edilmez.</p><div className="setting-divider"/><label className="setting-label">İletişim tarzı</label><div className="choice-row tone-row"><button className={prefs.tone==="natural"?"chosen":""} onClick={()=>setPrefs(p=>({...p,tone:"natural"}))}>Doğal</button><button className={prefs.tone==="friendly"?"chosen":""} onClick={()=>setPrefs(p=>({...p,tone:"friendly"}))}>Samimi</button><button className={prefs.tone==="professional"?"chosen":""} onClick={()=>setPrefs(p=>({...p,tone:"professional"}))}>Profesyonel</button></div></>}
-      {settingsTab==="system"&&<><div className="section-title">SİSTEM DURUMU</div><div className="system-card"><div className="system-icon"><Zap size={18}/></div><div><b>{modelInfo.provider}</b><small>Aktif yapay zekâ sağlayıcısı</small></div><span className={`system-status ${modelInfo.configured?"":"inactive"}`}>{modelInfo.configured?"YAPILANDI":"KONTROL ET"}</span></div><div className="system-row"><span>Model</span><b>{modelInfo.model}</b></div><div className="system-row"><span>API anahtarı</span><b>{modelInfo.configured?"Sunucuda tanımlı":"Eksik"}</b></div><div className="system-row"><span>Sohbet depolama</span><b>Bu tarayıcı</b></div><div className="system-row"><span>Uygulama</span><b>NEXUS AI 2.0</b></div><p className="modal-note">API anahtarın tarayıcıya gönderilmez. Sağlayıcı ve model bilgileri sunucu ortam değişkenlerinden okunur.</p><button className="reset-button" onClick={()=>{if(confirm("Tüm sohbetleri silmek istediğine emin misin?")){localStorage.removeItem(STORE);const c=newChat();setChats([c]);setActive(c.id);}}}><RotateCcw size={14}/> Sohbet geçmişini temizle</button></>}
+      {settingsTab==="system"&&<><div className="section-title">SİSTEM DURUMU</div><div className="system-card"><div className="system-icon"><Zap size={18}/></div><div><b>{modelInfo.provider}</b><small>Aktif yapay zekâ sağlayıcısı</small></div><span className={`system-status ${modelInfo.configured?"":"inactive"}`}>{modelInfo.configured?"YAPILANDI":"KONTROL ET"}</span></div><div className="system-row"><span>Model</span><b>{modelInfo.model}</b></div><div className="system-row"><span>API anahtarı</span><b>{modelInfo.configured?"Sunucuda tanımlı":"Eksik"}</b></div><div className="system-row"><span>Sohbet depolama</span><b>Bu tarayıcı</b></div><div className="system-row"><span>Uygulama</span><b>NEXUS AI 2.0</b></div><p className="modal-note">API anahtarın tarayıcıya gönderilmez. Sağlayıcı ve model bilgileri sunucu ortam değişkenlerinden okunur.</p><button className="reset-button" onClick={()=>{if(confirm("Tüm sohbetleri silmek istediğine emin misin?")){localStorage.removeItem(`${STORE}_${userId}`);const c=newChat();setChats([c]);setActive(c.id);}}}><RotateCcw size={14}/> Sohbet geçmişini temizle</button></>}
       </div></div><div className="settings-footer"><span><Check size={13}/> Değişiklikler otomatik kaydedilir</span><button className="primary" onClick={()=>setSettings(false)}>Tamam</button></div></div></div>}
   </main>;
 }
