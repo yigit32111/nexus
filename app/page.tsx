@@ -1,4 +1,6 @@
+
 "use client";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../utils/supabase/client";
@@ -6,16 +8,54 @@ import {
   Activity, AudioLines, Brain, Check, ChevronDown, CirclePlus, Command,
   Download, Gauge, Menu, Mic, MoreHorizontal, PanelLeftClose, Plus,
   Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, X, Zap,
-  MessageSquare, SlidersHorizontal, Database, RotateCcw, Search, LogOut
+  MessageSquare, SlidersHorizontal, Database, RotateCcw, Search, LogOut,
+  Paperclip, FileText, Image as ImageIcon
 } from "lucide-react";
 
-type Message = { role: "user" | "assistant"; content: string };
-type Chat = { id: string; title: string; messages: Message[]; updatedAt: number };
-type Prefs = { memory: string; style: "balanced" | "concise" | "detailed"; tone: "natural" | "professional" | "friendly"; temperature: number };
+type MessageAttachment = {
+  name: string;
+  type: string;
+};
+
+type ChatAttachment = MessageAttachment & {
+  dataUrl: string;
+};
+
+type Message = {
+  role: "user" | "assistant";
+  content: string;
+  attachments?: MessageAttachment[];
+};
+
+type Chat = {
+  id: string;
+  title: string;
+  messages: Message[];
+  updatedAt: number;
+};
+
+type Prefs = {
+  memory: string;
+  style: "balanced" | "concise" | "detailed";
+  tone: "natural" | "professional" | "friendly";
+  temperature: number;
+};
+
 const STORE = "nexus_chats_v2";
 const PREFS = "nexus_prefs_v2";
-const intro: Message = { role: "assistant", content: "Merhaba. Ben NEXUS. Hazırım. Bugün ne üzerinde çalışalım?" };
-const defaults: Prefs = { memory: "", style: "balanced", tone: "natural", temperature: 70 };
+
+const intro: Message = {
+  role: "assistant",
+  content: "Merhaba. Ben NEXUS. Hazırım. Bugün ne üzerinde çalışalım."
+};
+
+const defaults: Prefs = {
+  memory: "",
+  style: "balanced",
+  tone: "natural",
+  temperature: 70
+};
+
 function newChat(): Chat {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
@@ -24,29 +64,74 @@ function newChat(): Chat {
     updatedAt: Date.now()
   };
 }
-function titleFrom(text: string) { return text.trim().slice(0, 34) || "Yeni sohbet"; }
+
+function titleFrom(text: string) {
+  return text.trim().slice(0, 34) || "Yeni sohbet";
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Dosya okunamadı."));
+    };
+    reader.onerror = () => reject(new Error("Dosya okunurken hata oluştu."));
+    reader.readAsDataURL(file);
+  });
+}
+
+const MAX_FILES = 3;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_DOCUMENT_SIZE = 8 * 1024 * 1024;
+
+const ALLOWED_TYPES = [
+  "application/pdf",
+  "text/plain",
+  "image/jpeg",
+  "image/png",
+  "image/webp"
+];
 
 export default function Home() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+
   const [userId, setUserId] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [authLoading, setAuthLoading] = useState(true);
+  const [cloudReady, setCloudReady] = useState(false);
+  const [cloudStatus, setCloudStatus] = useState("Bulut hazırlanıyor…");
+
   const [chats, setChats] = useState<Chat[]>([]);
   const [active, setActive] = useState("");
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+
   const [sidebar, setSidebar] = useState(true);
   const [settings, setSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"general" | "personal" | "system">("general");
+
   const [prefs, setPrefs] = useState<Prefs>(defaults);
+  const [prefsReady, setPrefsReady] = useState(false);
+
   const [voice, setVoice] = useState(false);
   const [ready, setReady] = useState(false);
   const [booting, setBooting] = useState(true);
   const [status, setStatus] = useState("");
-  const [modelInfo, setModelInfo] = useState({ model: "Yükleniyor…", provider: "AI sağlayıcısı", configured: false });
+
+  const [modelInfo, setModelInfo] = useState({
+    model: "Yükleniyor…",
+    provider: "AI sağlayıcısı",
+    configured: false
+  });
+
   const [search, setSearch] = useState("");
+
   const endRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const activeChat = chats.find(c => c.id === active);
 
   useEffect(() => {
@@ -55,6 +140,7 @@ export default function Home() {
 
     async function initialize() {
       const { data, error } = await supabase.auth.getUser();
+
       if (cancelled) return;
 
       if (error || !data.user) {
@@ -64,48 +150,121 @@ export default function Home() {
       }
 
       const id = data.user.id;
+
       setUserId(id);
       setUserEmail(data.user.email ?? "");
 
+      let cloudChats: Chat[] | null = null;
+
+      const cloudResult = await supabase
+        .from("nexus_chats")
+        .select("id, title, messages, updated_at")
+        .eq("user_id", id)
+        .order("updated_at", { ascending: false });
+
+      if (cancelled) return;
+
+      if (cloudResult.error) {
+        console.error("NEXUS CLOUD LOAD ERROR:", cloudResult.error);
+        setCloudStatus("Bulut yükleme başarısız; yerel sohbetler kullanılıyor.");
+      } else if (Array.isArray(cloudResult.data)) {
+        cloudChats = cloudResult.data.map((row: any) => ({
+          id: String(row.id),
+          title: String(row.title || "Yeni sohbet"),
+          messages: Array.isArray(row.messages) ? row.messages : [intro],
+          updatedAt: row.updated_at
+            ? new Date(row.updated_at).getTime()
+            : Date.now()
+        }));
+
+        setCloudStatus("Buluttan yüklendi");
+      }
+
       try {
         const stored = localStorage.getItem(`${STORE}_${id}`);
-        if (stored) {
-          const parsed: Chat[] = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length) {
-            setChats(parsed);
-            setActive(parsed[0].id);
-          } else {
-            const c = newChat();
-            setChats([c]);
-            setActive(c.id);
-          }
-        } else {
-          const c = newChat();
-          setChats([c]);
-          setActive(c.id);
+        const localChats: Chat[] = stored ? JSON.parse(stored) : [];
+
+        const initialChats =
+          cloudChats && cloudChats.length
+            ? cloudChats
+            : Array.isArray(localChats) && localChats.length
+              ? localChats
+              : [newChat()];
+
+        setChats(initialChats);
+        setActive(initialChats[0].id);
+
+        if (cloudChats && cloudChats.length) {
+          localStorage.setItem(`${STORE}_${id}`, JSON.stringify(cloudChats));
         }
-        setPrefs({ ...defaults, ...JSON.parse(localStorage.getItem(`${PREFS}_${id}`) || "{}") });
       } catch {
         const c = newChat();
         setChats([c]);
         setActive(c.id);
-        setPrefs(defaults);
       }
 
+      let initialPrefs: Prefs = defaults;
+
+      try {
+        const localPrefs = JSON.parse(
+          localStorage.getItem(`${PREFS}_${id}`) || "{}"
+        );
+
+        const prefsResult = await supabase
+          .from("nexus_user_settings")
+          .select("prefs")
+          .eq("user_id", id)
+          .maybeSingle();
+
+        if (cancelled) return;
+
+        if (prefsResult.error) {
+          console.error("NEXUS PREFS LOAD ERROR:", prefsResult.error);
+          initialPrefs = { ...defaults, ...localPrefs };
+          setCloudStatus("Sohbetler bulutta; ayarlar yerel yedekten yüklendi.");
+        } else if (
+          prefsResult.data?.prefs &&
+          typeof prefsResult.data.prefs === "object"
+        ) {
+          initialPrefs = { ...defaults, ...prefsResult.data.prefs };
+        } else {
+          initialPrefs = { ...defaults, ...localPrefs };
+        }
+      } catch (prefsError) {
+        console.error("NEXUS PREFS INIT ERROR:", prefsError);
+
+        try {
+          initialPrefs = {
+            ...defaults,
+            ...JSON.parse(localStorage.getItem(`${PREFS}_${id}`) || "{}")
+          };
+        } catch {
+          initialPrefs = defaults;
+        }
+      }
+
+      setPrefs(initialPrefs);
+      setPrefsReady(true);
       setReady(true);
+      setCloudReady(true);
       setAuthLoading(false);
+
       timer = window.setTimeout(() => setBooting(false), 1450);
+
       fetch("/api/status")
         .then(r => r.json())
         .then(setModelInfo)
-        .catch(() => setModelInfo({
-          model: "Bilinmiyor",
-          provider: "Bağlantı kontrol edilemedi",
-          configured: false
-        }));
+        .catch(() =>
+          setModelInfo({
+            model: "Bilinmiyor",
+            provider: "Bağlantı kontrol edilemedi",
+            configured: false
+          })
+        );
     }
 
     initialize();
+
     return () => {
       cancelled = true;
       if (timer !== undefined) window.clearTimeout(timer);
@@ -113,31 +272,297 @@ export default function Home() {
   }, [router, supabase]);
 
   useEffect(() => {
-    if (ready && userId) localStorage.setItem(`${STORE}_${userId}`, JSON.stringify(chats));
+    if (ready && userId) {
+      localStorage.setItem(`${STORE}_${userId}`, JSON.stringify(chats));
+    }
   }, [chats, ready, userId]);
-  useEffect(() => {
-    if (ready && userId) localStorage.setItem(`${PREFS}_${userId}`, JSON.stringify(prefs));
-  }, [prefs, ready, userId]);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [activeChat?.messages, busy]);
 
-  const sortedChats = useMemo(() => [...chats].sort((a,b)=>b.updatedAt-a.updatedAt).filter(c => c.title.toLowerCase().includes(search.toLowerCase())), [chats, search]);
-  function createChat() { const c = newChat(); setChats(prev=>[c,...prev]); setActive(c.id); setInput(""); if (window.innerWidth < 760) setSidebar(false); }
-  function patchMessages(id: string, messages: Message[]) { setChats(prev=>prev.map(c=>c.id===id?{...c,messages,updatedAt:Date.now()}:c)); }
-  function deleteChat(id: string) { const next=chats.filter(c=>c.id!==id); if(next.length){setChats(next); if(active===id)setActive(next[0].id);} else {const c=newChat();setChats([c]);setActive(c.id);} }
-  async function send(text?: string) {
-    const value=(text ?? input).trim(); if(!value || busy) return;
-    let chat=activeChat; if(!chat){chat=newChat();setChats([chat]);setActive(chat.id);}
-    const id=chat.id; const prior=chat.messages; const messages=[...prior,{role:"user" as const,content:value}];
-    patchMessages(id,messages); setInput(""); setBusy(true); setStatus("");
-    try {
-      const res=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:messages.slice(-24),memory:prefs.memory,preferences:{style:prefs.style,tone:prefs.tone,temperature:prefs.temperature/100}})});
-      const data=await res.json(); if(!res.ok) throw new Error(data.error||"İstek başarısız.");
-      const answer=String(data.reply||"Yanıt alınamadı."); patchMessages(id,[...messages,{role:"assistant",content:answer}]);
-      setChats(prev=>prev.map(c=>c.id===id&&c.title==="Yeni sohbet"?{...c,title:titleFrom(value)}:c));
-      if(voice && "speechSynthesis" in window) { speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance(answer)); }
-    } catch(e:unknown) { const message=e instanceof Error?e.message:"Bilinmeyen hata"; patchMessages(id,[...messages,{role:"assistant",content:`Bağlantı hatası: ${message}\n\nAPI ayarlarını (.env.local) ve sağlayıcı limitlerini kontrol et.`}]); }
-    finally {setBusy(false);}
+  useEffect(() => {
+    if (ready && prefsReady && userId) {
+      localStorage.setItem(`${PREFS}_${userId}`, JSON.stringify(prefs));
+    }
+  }, [prefs, prefsReady, ready, userId]);
+
+  useEffect(() => {
+    if (!ready || !prefsReady || !userId) return;
+
+    const timeout = window.setTimeout(async () => {
+      const { error } = await supabase
+        .from("nexus_user_settings")
+        .upsert(
+          {
+            user_id: userId,
+            prefs,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: "user_id" }
+        );
+
+      if (error) {
+        console.error("NEXUS PREFS SAVE ERROR:", error);
+        setCloudStatus(`Ayar kaydetme hatası: ${error.message}`);
+      } else {
+        setCloudStatus("Ayarlar ve hafıza buluta kaydedildi");
+      }
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [prefs, prefsReady, ready, userId, supabase]);
+
+  useEffect(() => {
+    if (!ready || !cloudReady || !userId || chats.length === 0) return;
+
+    const timeout = window.setTimeout(async () => {
+      const rows = chats.map(chat => ({
+        id: chat.id,
+        user_id: userId,
+        title: chat.title || "Yeni sohbet",
+        messages: chat.messages,
+        updated_at: new Date(chat.updatedAt || Date.now()).toISOString()
+      }));
+
+      try {
+        const { error } = await supabase
+          .from("nexus_chats")
+          .upsert(rows, { onConflict: "id" });
+
+        if (error) {
+          console.error("NEXUS CLOUD SAVE ERROR:", error);
+          setCloudStatus(`Bulut kayıt hatası: ${error.message}`);
+        } else {
+          setCloudStatus("Buluta kaydedildi");
+        }
+      } catch (exception: unknown) {
+        console.error("NEXUS CLOUD SYNC ERROR:", exception);
+        setCloudStatus("Bulut bağlantısı kurulamadı");
+      }
+    }, 650);
+
+    return () => window.clearTimeout(timeout);
+  }, [chats, ready, cloudReady, userId, supabase]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [activeChat?.messages, busy]);
+
+  const sortedChats = useMemo(
+    () =>
+      [...chats]
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .filter(c => c.title.toLowerCase().includes(search.toLowerCase())),
+    [chats, search]
+  );
+
+  function createChat() {
+    const c = newChat();
+    setChats(prev => [c, ...prev]);
+    setActive(c.id);
+    setInput("");
+    setAttachments([]);
+
+    if (window.innerWidth < 760) setSidebar(false);
   }
+
+  function patchMessages(id: string, messages: Message[]) {
+    setChats(prev =>
+      prev.map(c =>
+        c.id === id
+          ? { ...c, messages, updatedAt: Date.now() }
+          : c
+      )
+    );
+  }
+
+  function deleteChat(id: string) {
+    void deleteCloudChat(id);
+
+    const next = chats.filter(c => c.id !== id);
+
+    if (next.length) {
+      setChats(next);
+      if (active === id) setActive(next[0].id);
+    } else {
+      const c = newChat();
+      setChats([c]);
+      setActive(c.id);
+    }
+  }
+
+  async function deleteCloudChat(id: string) {
+    if (!userId) return;
+
+    const { error } = await supabase
+      .from("nexus_chats")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("NEXUS CLOUD DELETE ERROR:", error);
+      setCloudStatus("Bulut sohbet silme hatası: " + error.message);
+    }
+  }
+
+  async function handleFiles(files: FileList | null) {
+    if (!files) return;
+
+    const selectedFiles = Array.from(files);
+
+    if (attachments.length + selectedFiles.length > MAX_FILES) {
+      setStatus("Bir mesajda en fazla 3 dosya ekleyebilirsin.");
+      return;
+    }
+
+    const newAttachments: ChatAttachment[] = [];
+
+    for (const file of selectedFiles) {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        setStatus(`${file.name}: Bu dosya türü desteklenmiyor.`);
+        continue;
+      }
+
+      const isImage = file.type.startsWith("image/");
+      const maxSize = isImage ? MAX_IMAGE_SIZE : MAX_DOCUMENT_SIZE;
+
+      if (file.size > maxSize) {
+        setStatus(
+          `${file.name}: Dosya boyutu sınırı aşıldı.`
+        );
+        continue;
+      }
+
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+
+        newAttachments.push({
+          name: file.name,
+          type: file.type,
+          dataUrl
+        });
+      } catch {
+        setStatus(`${file.name}: Dosya okunamadı.`);
+      }
+    }
+
+    setAttachments(prev => [...prev, ...newAttachments]);
+    if (newAttachments.length) setStatus("");
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  }
+
+  async function send(text?: string) {
+    const value = (text ?? input).trim();
+
+    if ((!value && attachments.length === 0) || busy) return;
+
+    let chat = activeChat;
+
+    if (!chat) {
+      chat = newChat();
+      setChats([chat]);
+      setActive(chat.id);
+    }
+
+    const id = chat.id;
+    const prior = chat.messages;
+
+    const outgoingAttachments = [...attachments];
+
+    const attachmentMetadata = outgoingAttachments.map(file => ({
+      name: file.name,
+      type: file.type
+    }));
+
+    const messageContent =
+      value || "Eklediğim dosyaları incele ve açıkla.";
+
+    const messages: Message[] = [
+      ...prior,
+      {
+        role: "user",
+        content: messageContent,
+        ...(attachmentMetadata.length
+          ? { attachments: attachmentMetadata }
+          : {})
+      }
+    ];
+
+    patchMessages(id, messages);
+    setInput("");
+    setBusy(true);
+    setStatus("");
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          messages: messages.slice(-24),
+          memory: prefs.memory,
+          preferences: {
+            style: prefs.style,
+            tone: prefs.tone,
+            temperature: prefs.temperature / 100
+          },
+          attachments: outgoingAttachments
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "İstek başarısız.");
+      }
+
+      const answer = String(data.reply || "Yanıt alınamadı.");
+
+      patchMessages(id, [
+        ...messages,
+        { role: "assistant", content: answer }
+      ]);
+
+      setAttachments([]);
+
+      setChats(prev =>
+        prev.map(c =>
+          c.id === id && c.title === "Yeni sohbet"
+            ? { ...c, title: titleFrom(messageContent) }
+            : c
+        )
+      );
+
+      if (voice && "speechSynthesis" in window) {
+        speechSynthesis.cancel();
+        speechSynthesis.speak(
+          new SpeechSynthesisUtterance(answer)
+        );
+      }
+    } catch (e: unknown) {
+      const message =
+        e instanceof Error ? e.message : "Bilinmeyen hata";
+
+      patchMessages(id, [
+        ...messages,
+        {
+          role: "assistant",
+          content:
+            `Bağlantı hatası: ${message}\n\n` +
+            "API ayarlarını ve sağlayıcı limitlerini kontrol et."
+        }
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
     setReady(false);
@@ -147,48 +572,860 @@ export default function Home() {
   }
 
   function dictate() {
-    const w=window as Window & { SpeechRecognition?: new()=>any; webkitSpeechRecognition?: new()=>any }; const Speech=w.SpeechRecognition||w.webkitSpeechRecognition;
-    if(!Speech){setStatus("Bu tarayıcı sesli yazmayı desteklemiyor.");return;}
-    const rec=new Speech(); rec.lang="tr-TR"; rec.interimResults=false;
-    rec.onresult=(e:any)=>setInput(prev=>prev+(prev?" ":"")+e.results[0][0].transcript); rec.onerror=()=>setStatus("Ses tanıma tamamlanamadı."); rec.start();
+    const w = window as Window & {
+      SpeechRecognition?: new () => any;
+      webkitSpeechRecognition?: new () => any;
+    };
+
+    const Speech = w.SpeechRecognition || w.webkitSpeechRecognition;
+
+    if (!Speech) {
+      setStatus("Bu tarayıcı sesli yazmayı desteklemiyor.");
+      return;
+    }
+
+    const rec = new Speech();
+    rec.lang = "tr-TR";
+    rec.interimResults = false;
+
+    rec.onresult = (e: any) =>
+      setInput(prev =>
+        prev + (prev ? " " : "") + e.results[0][0].transcript
+      );
+
+    rec.onerror = () =>
+      setStatus("Ses tanıma tamamlanamadı.");
+
+    rec.start();
   }
+
   function exportChat() {
-    if(!activeChat)return; const blob=new Blob([activeChat.messages.map(m=>`${m.role==="user"?"Sen":"NEXUS"}:\n${m.content}`).join("\n\n")],{type:"text/plain;charset=utf-8"});
-    const url=URL.createObjectURL(blob); const a=document.createElement("a");a.href=url;a.download=`nexus-${activeChat.title.replace(/\W+/g,"-")}.txt`;a.click();URL.revokeObjectURL(url);
+    if (!activeChat) return;
+
+    const blob = new Blob(
+      [
+        activeChat.messages
+          .map(m => {
+            const files = m.attachments?.length
+              ? `\nDosyalar: ${m.attachments.map(a => a.name).join(", ")}`
+              : "";
+
+            return `${m.role === "user" ? "Sen" : "NEXUS"}:\n${m.content}${files}`;
+          })
+          .join("\n\n")
+      ],
+      { type: "text/plain;charset=utf-8" }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+
+    a.href = url;
+    a.download = `nexus-${activeChat.title.replace(/\W+/g, "-")}.txt`;
+    a.click();
+
+    URL.revokeObjectURL(url);
   }
 
   if (authLoading || !ready || !userId) {
-    return <main className="app-shell"><div className="boot-screen">
-      <div className="boot-brand">
-        <div className="boot-word">NEXUS<span>AI</span></div>
-        <div className="boot-loading">OTURUM KONTROL EDİLİYOR <span>●</span></div>
-      </div>
-    </div></main>;
+    return (
+      <main className="app-shell">
+        <div className="boot-screen">
+          <div className="boot-brand">
+            <div className="boot-word">
+              NEXUS<span>AI</span>
+            </div>
+            <div className="boot-loading">
+              OTURUM KONTROL EDİLİYOR <span>●</span>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
   }
 
-  return <main className="app-shell">
-    {booting && <div className="boot-screen"><div className="boot-grid"/><div className="boot-brand"><div className="boot-orb"><div/><div/><Sparkles size={29}/></div><div className="boot-word">NEXUS<span>AI</span></div><div className="boot-sub">PERSONAL INTELLIGENCE SYSTEM</div><div className="boot-progress"><i/></div><div className="boot-loading">SİSTEM BAŞLATILIYOR <span>●</span></div></div></div>}
-    <aside className={`sidebar ${sidebar?"open":"closed"}`}>
-      <div className="brand"><div className="brand-orb"><Sparkles size={18}/></div><div><b>NEXUS</b><small>PERSONAL AI</small></div><button className="icon-btn hide-mobile" onClick={()=>setSidebar(false)} aria-label="Paneli kapat"><PanelLeftClose size={17}/></button></div>
-      <button className="new-chat" onClick={createChat}><Plus size={17}/> Yeni sohbet <span>⌘ K</span></button>
-      <div className="history-heading"><div className="history-label">ÇALIŞMA ALANI</div><button className="icon-btn compact" onClick={createChat}><CirclePlus size={15}/></button></div>
-      <div className="search-box"><Search size={14}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Sohbetlerde ara"/></div>
-      <div className="history-label history-title">SON SOHBETLER</div>
-      <div className="history-list">{sortedChats.map(c=><div key={c.id} className={`history-item ${active===c.id?"selected":""}`}><button className="history-select" onClick={()=>{setActive(c.id);if(window.innerWidth<760)setSidebar(false);}}><MessageSquare size={14}/><span>{c.title}</span></button><button className="tiny-btn" onClick={()=>deleteChat(c.id)} title="Sohbeti sil"><Trash2 size={13}/></button></div>)}</div>
-      <div className="sidebar-bottom"><div className="provider-card"><div className="provider-icon"><Zap size={15}/></div><div className="provider-copy"><b>{modelInfo.provider}</b><small>{modelInfo.model}</small></div><span className={`provider-dot ${modelInfo.configured?"":"off"}`}/></div><div className="user-card"><div className="avatar">N</div><div className="user-copy"><b>{userEmail || "NEXUS kullanıcısı"}</b><small>Hesabın</small></div><button className="icon-btn" onClick={()=>setSettings(true)} title="Ayarlar"><Settings size={17}/></button><button className="icon-btn" onClick={signOut} title="Çıkış yap"><LogOut size={17}/></button></div></div>
-    </aside>
-    <section className="main">
-      <header className="topbar"><button className="icon-btn" onClick={()=>setSidebar(!sidebar)} aria-label="Menü"><Menu size={19}/></button><div className="top-title"><span className="status-dot"/><b>NEXUS AI</b><span className="model-pill">{modelInfo.model}</span></div><div className="top-actions"><div className="secure-label"><ShieldCheck size={13}/> GÜVENLİ OTURUM</div><button className="icon-btn" onClick={exportChat} title="Sohbeti dışa aktar"><Download size={17}/></button><button className="icon-btn" onClick={()=>setSettings(true)} title="Ayarlar"><SlidersHorizontal size={18}/></button></div></header>
-      <div className="conversation">
-        {!activeChat || activeChat.messages.length<=1 ? <div className="welcome"><div className="welcome-kicker"><span className="status-dot"/> SİSTEM ÇEVRİMİÇİ <span className="kicker-line"/></div><div className="hero-orb"><div className="orb-halo"/><div className="orb-ring ring-one"/><div className="orb-ring ring-two"/><div className="orb-core"><Sparkles size={31}/></div><span className="orb-node node-a"/><span className="orb-node node-b"/></div><div className="welcome-eyebrow">YOUR PERSONAL INTELLIGENCE</div><h1>Merhaba, ben <em>NEXUS.</em></h1><p>Fikirlerini gerçeğe dönüştürmek, karmaşık konuları çözmek<br className="desktop-break"/> ve üretkenliğini artırmak için buradayım.</p><div className="suggestions">{[{icon:<Brain size={17}/>,title:"Bir konuyu keşfet",desc:"Merak ettiğin konuyu derinlemesine incele"},{icon:<Command size={17}/>,title:"Bir proje tasarla",desc:"Fikrini adım adım plana dönüştür"},{icon:<Activity size={17}/>,title:"Kendini organize et",desc:"Hedeflerini ve gününü planla"},{icon:<AudioLines size={17}/>,title:"Yaratıcı düşün",desc:"Yeni fikirler ve alternatifler üret"}].map((s)=><button key={s.title} onClick={()=>send(s.title)}><span className="suggestion-icon">{s.icon}</span><span className="suggestion-copy"><b>{s.title}</b><small>{s.desc}</small></span><span className="suggestion-arrow">↗</span></button>)}</div></div> : <div className="messages">{activeChat.messages.filter((m,i)=>!(i===0&&m.role==="assistant"&&m.content===intro.content)).map((m,i)=><article key={i} className={`message ${m.role}`}><div className="message-avatar">{m.role==="assistant"?<Sparkles size={15}/>:"Y"}</div><div className="message-body"><div className="message-name">{m.role==="assistant"?"NEXUS":"SEN"}</div><div className="message-text">{m.content}</div></div></article>)}{busy&&<article className="message assistant"><div className="message-avatar"><Sparkles size={15}/></div><div className="message-body"><div className="message-name">NEXUS ÜRETİYOR</div><div className="typing"><i/><i/><i/></div></div></article>}</div>}
-        <div ref={endRef}/>
-      </div>
-      <div className="composer-wrap"><div className="composer"><textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="Bir şey sor veya bir fikir anlat..." rows={1}/><div className="composer-tools"><div className="composer-left"><button className={`tool-btn ${voice?"active":""}`} onClick={()=>setVoice(!voice)} title="Yanıtları seslendir"><Volume2 size={16}/></button><button className="tool-btn" onClick={dictate} title="Sesle yaz"><Mic size={16}/></button><span className="voice-state">{voice?"SES AKTİF":"NEXUS HAZIR"}</span></div><span className="composer-hint">Enter gönder · Shift+Enter satır</span><button className="send-btn" disabled={!input.trim()||busy} onClick={()=>send()}><Send size={16}/></button></div></div><div className="composer-footer"><span><ShieldCheck size={12}/> Mesajların bu tarayıcıdaki sohbet geçmişinde saklanır.</span><span>POWERED BY {modelInfo.provider.toUpperCase()}</span></div>{status&&<div className="status-msg">{status}</div>}</div>
-    </section>
-    {settings&&<div className="modal-backdrop" onClick={()=>setSettings(false)}><div className="settings-modal" onClick={e=>e.stopPropagation()}><div className="settings-top"><div><div className="settings-kicker">CONTROL CENTER</div><h2>NEXUS ayarları</h2><p>Deneyimini kendi çalışma tarzına göre düzenle.</p></div><button className="icon-btn close-settings" onClick={()=>setSettings(false)}><X size={18}/></button></div><div className="settings-layout"><nav className="settings-nav"><button className={settingsTab==="general"?"active":""} onClick={()=>setSettingsTab("general")}><SlidersHorizontal size={16}/> Genel</button><button className={settingsTab==="personal"?"active":""} onClick={()=>setSettingsTab("personal")}><Brain size={16}/> Kişiselleştirme</button><button className={settingsTab==="system"?"active":""} onClick={()=>setSettingsTab("system")}><Activity size={16}/> Sistem</button></nav><div className="settings-content">
-      {settingsTab==="general"&&<><div className="section-title">YANIT TERCİHLERİ</div><label className="setting-label">Cevap uzunluğu</label><div className="choice-row"><button className={prefs.style==="concise"?"chosen":""} onClick={()=>setPrefs(p=>({...p,style:"concise"}))}>Kısa</button><button className={prefs.style==="balanced"?"chosen":""} onClick={()=>setPrefs(p=>({...p,style:"balanced"}))}>Dengeli</button><button className={prefs.style==="detailed"?"chosen":""} onClick={()=>setPrefs(p=>({...p,style:"detailed"}))}>Detaylı</button></div><div className="setting-divider"/><div className="setting-label-row"><label className="setting-label">Yaratıcılık seviyesi</label><b>{prefs.temperature}%</b></div><input className="range" type="range" min="0" max="100" value={prefs.temperature} onChange={e=>setPrefs(p=>({...p,temperature:Number(e.target.value)}))}/><div className="range-labels"><span>Daha tutarlı</span><span>Daha yaratıcı</span></div><div className="setting-divider"/><div className="setting-label">Sesli yanıt</div><button className={`toggle-row ${voice?"enabled":""}`} onClick={()=>setVoice(!voice)}><span><Volume2 size={17}/> NEXUS yanıtlarını sesli okusun</span><i/></button></>}
-      {settingsTab==="personal"&&<><div className="section-title">NEXUS HAFIZASI</div><label className="setting-label">Kişisel bağlam</label><textarea className="memory-input" value={prefs.memory} onChange={e=>setPrefs(p=>({...p,memory:e.target.value}))} placeholder="NEXUS'un bilmesini istediğin tercihleri, hedeflerini veya çalışma şeklini yaz..."/><p className="modal-note"><Database size={13}/> Bu bilgiler bu tarayıcıda saklanır ve yanıt oluşturulurken bağlam olarak kullanılır. Farklı cihazlarla otomatik senkronize edilmez.</p><div className="setting-divider"/><label className="setting-label">İletişim tarzı</label><div className="choice-row tone-row"><button className={prefs.tone==="natural"?"chosen":""} onClick={()=>setPrefs(p=>({...p,tone:"natural"}))}>Doğal</button><button className={prefs.tone==="friendly"?"chosen":""} onClick={()=>setPrefs(p=>({...p,tone:"friendly"}))}>Samimi</button><button className={prefs.tone==="professional"?"chosen":""} onClick={()=>setPrefs(p=>({...p,tone:"professional"}))}>Profesyonel</button></div></>}
-      {settingsTab==="system"&&<><div className="section-title">SİSTEM DURUMU</div><div className="system-card"><div className="system-icon"><Zap size={18}/></div><div><b>{modelInfo.provider}</b><small>Aktif yapay zekâ sağlayıcısı</small></div><span className={`system-status ${modelInfo.configured?"":"inactive"}`}>{modelInfo.configured?"YAPILANDI":"KONTROL ET"}</span></div><div className="system-row"><span>Model</span><b>{modelInfo.model}</b></div><div className="system-row"><span>API anahtarı</span><b>{modelInfo.configured?"Sunucuda tanımlı":"Eksik"}</b></div><div className="system-row"><span>Sohbet depolama</span><b>Bu tarayıcı</b></div><div className="system-row"><span>Uygulama</span><b>NEXUS AI 2.0</b></div><p className="modal-note">API anahtarın tarayıcıya gönderilmez. Sağlayıcı ve model bilgileri sunucu ortam değişkenlerinden okunur.</p><button className="reset-button" onClick={()=>{if(confirm("Tüm sohbetleri silmek istediğine emin misin?")){localStorage.removeItem(`${STORE}_${userId}`);const c=newChat();setChats([c]);setActive(c.id);}}}><RotateCcw size={14}/> Sohbet geçmişini temizle</button></>}
-      </div></div><div className="settings-footer"><span><Check size={13}/> Değişiklikler otomatik kaydedilir</span><button className="primary" onClick={()=>setSettings(false)}>Tamam</button></div></div></div>}
-  </main>;
+  return (
+    <main className="app-shell">
+      {booting && (
+        <div className="boot-screen">
+          <div className="boot-grid" />
+          <div className="boot-brand">
+            <div className="boot-orb">
+              <div />
+              <div />
+              <Sparkles size={29} />
+            </div>
+            <div className="boot-word">
+              NEXUS<span>AI</span>
+            </div>
+            <div className="boot-sub">
+              PERSONAL INTELLIGENCE SYSTEM
+            </div>
+            <div className="boot-progress">
+              <i />
+            </div>
+            <div className="boot-loading">
+              SİSTEM BAŞLATILIYOR <span>●</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <aside className={`sidebar ${sidebar ? "open" : "closed"}`}>
+        <div className="brand">
+          <div className="brand-orb">
+            <Sparkles size={18} />
+          </div>
+          <div>
+            <b>NEXUS</b>
+            <small>PERSONAL AI</small>
+          </div>
+          <button
+            className="icon-btn hide-mobile"
+            onClick={() => setSidebar(false)}
+            aria-label="Paneli kapat"
+          >
+            <PanelLeftClose size={17} />
+          </button>
+        </div>
+
+        <button className="new-chat" onClick={createChat}>
+          <Plus size={17} /> Yeni sohbet <span>⌘ K</span>
+        </button>
+
+        <div className="history-heading">
+          <div className="history-label">ÇALIŞMA ALANI</div>
+          <button
+            className="icon-btn compact"
+            onClick={createChat}
+          >
+            <CirclePlus size={15} />
+          </button>
+        </div>
+
+        <div className="search-box">
+          <Search size={14} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Sohbetlerde ara"
+          />
+        </div>
+
+        <div className="history-label history-title">
+          SON SOHBETLER
+        </div>
+
+        <div className="history-list">
+          {sortedChats.map(c => (
+            <div
+              key={c.id}
+              className={`history-item ${active === c.id ? "selected" : ""}`}
+            >
+              <button
+                className="history-select"
+                onClick={() => {
+                  setActive(c.id);
+                  setAttachments([]);
+                  if (window.innerWidth < 760) setSidebar(false);
+                }}
+              >
+                <MessageSquare size={14} />
+                <span>{c.title}</span>
+              </button>
+
+              <button
+                className="tiny-btn"
+                onClick={() => deleteChat(c.id)}
+                title="Sohbeti sil"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="sidebar-bottom">
+          <div className="provider-card">
+            <div className="provider-icon">
+              <Zap size={15} />
+            </div>
+            <div className="provider-copy">
+              <b>{modelInfo.provider}</b>
+              <small>{modelInfo.model}</small>
+            </div>
+            <span
+              className={`provider-dot ${modelInfo.configured ? "" : "off"}`}
+            />
+          </div>
+
+          <div className="user-card">
+            <div className="avatar">N</div>
+            <div className="user-copy">
+              <b>{userEmail || "NEXUS kullanıcısı"}</b>
+              <small>Hesabın</small>
+            </div>
+            <button
+              className="icon-btn"
+              onClick={() => setSettings(true)}
+              title="Ayarlar"
+            >
+              <Settings size={17} />
+            </button>
+            <button
+              className="icon-btn"
+              onClick={signOut}
+              title="Çıkış yap"
+            >
+              <LogOut size={17} />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <section className="main">
+        <header className="topbar">
+          <button
+            className="icon-btn"
+            onClick={() => setSidebar(!sidebar)}
+            aria-label="Menü"
+          >
+            <Menu size={19} />
+          </button>
+
+          <div className="top-title">
+            <span className="status-dot" />
+            <b>NEXUS AI</b>
+            <span className="model-pill">{modelInfo.model}</span>
+          </div>
+
+          <div className="top-actions">
+            <div className="secure-label">
+              <ShieldCheck size={13} /> GÜVENLİ OTURUM
+            </div>
+            <button
+              className="icon-btn"
+              onClick={exportChat}
+              title="Sohbeti dışa aktar"
+            >
+              <Download size={17} />
+            </button>
+            <button
+              className="icon-btn"
+              onClick={() => setSettings(true)}
+              title="Ayarlar"
+            >
+              <SlidersHorizontal size={18} />
+            </button>
+          </div>
+        </header>
+
+        <div className="conversation">
+          {!activeChat || activeChat.messages.length <= 1 ? (
+            <div className="welcome">
+              <div className="welcome-kicker">
+                <span className="status-dot" />
+                SİSTEM ÇEVRİMİÇİ
+                <span className="kicker-line" />
+              </div>
+
+              <div className="hero-orb">
+                <div className="orb-halo" />
+                <div className="orb-ring ring-one" />
+                <div className="orb-ring ring-two" />
+                <div className="orb-core">
+                  <Sparkles size={31} />
+                </div>
+                <span className="orb-node node-a" />
+                <span className="orb-node node-b" />
+              </div>
+
+              <div className="welcome-eyebrow">
+                YOUR PERSONAL INTELLIGENCE
+              </div>
+
+              <h1>
+                Merhaba, ben <em>NEXUS.</em>
+              </h1>
+
+              <p>
+                Fikirlerini gerçeğe dönüştürmek, karmaşık konuları çözmek
+                <br className="desktop-break" />
+                ve üretkenliğini artırmak için buradayım.
+              </p>
+
+              <div className="suggestions">
+                {[
+                  {
+                    icon: <Brain size={17} />,
+                    title: "Bir konuyu keşfet",
+                    desc: "Merak ettiğin konuyu derinlemesine incele"
+                  },
+                  {
+                    icon: <Command size={17} />,
+                    title: "Bir proje tasarla",
+                    desc: "Fikrini adım adım plana dönüştür"
+                  },
+                  {
+                    icon: <Activity size={17} />,
+                    title: "Kendini organize et",
+                    desc: "Hedeflerini ve gününü planla"
+                  },
+                  {
+                    icon: <AudioLines size={17} />,
+                    title: "Yaratıcı düşün",
+                    desc: "Yeni fikirler ve alternatifler üret"
+                  }
+                ].map(s => (
+                  <button key={s.title} onClick={() => send(s.title)}>
+                    <span className="suggestion-icon">{s.icon}</span>
+                    <span className="suggestion-copy">
+                      <b>{s.title}</b>
+                      <small>{s.desc}</small>
+                    </span>
+                    <span className="suggestion-arrow">↗</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="messages">
+              {activeChat.messages
+                .filter(
+                  (m, i) =>
+                    !(
+                      i === 0 &&
+                      m.role === "assistant" &&
+                      m.content === intro.content
+                    )
+                )
+                .map((m, i) => (
+                  <article
+                    key={i}
+                    className={`message ${m.role}`}
+                  >
+                    <div className="message-avatar">
+                      {m.role === "assistant"
+                        ? <Sparkles size={15} />
+                        : "Y"}
+                    </div>
+
+                    <div className="message-body">
+                      <div className="message-name">
+                        {m.role === "assistant" ? "NEXUS" : "SEN"}
+                      </div>
+
+                      <div className="message-text">
+                        {m.content}
+                      </div>
+
+                      {m.attachments && m.attachments.length > 0 && (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 8,
+                            marginTop: 10
+                          }}
+                        >
+                          {m.attachments.map((file, index) => (
+                            <div
+                              key={`${file.name}-${index}`}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 7,
+                                padding: "7px 10px",
+                                border: "1px solid var(--border, #333)",
+                                borderRadius: 9,
+                                fontSize: 12,
+                                opacity: 0.85
+                              }}
+                            >
+                              {file.type.startsWith("image/")
+                                ? <ImageIcon size={15} />
+                                : <FileText size={15} />}
+                              <span>{file.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                ))}
+
+              {busy && (
+                <article className="message assistant">
+                  <div className="message-avatar">
+                    <Sparkles size={15} />
+                  </div>
+                  <div className="message-body">
+                    <div className="message-name">
+                      NEXUS ÜRETİYOR
+                    </div>
+                    <div className="typing">
+                      <i /><i /><i />
+                    </div>
+                  </div>
+                </article>
+              )}
+            </div>
+          )}
+
+          <div ref={endRef} />
+        </div>
+
+        <div className="composer-wrap">
+          <div className="composer">
+            {attachments.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 9,
+                  padding: "12px 14px 4px"
+                }}
+              >
+                {attachments.map((file, index) => (
+                  <div
+                    key={`${file.name}-${index}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: 8,
+                      border: "1px solid var(--border, #444)",
+                      borderRadius: 10,
+                      maxWidth: 220,
+                      minWidth: 0
+                    }}
+                  >
+                    {file.type.startsWith("image/") ? (
+                      <img
+                        src={file.dataUrl}
+                        alt={file.name}
+                        style={{
+                          width: 38,
+                          height: 38,
+                          objectFit: "cover",
+                          borderRadius: 6
+                        }}
+                      />
+                    ) : (
+                      <FileText size={22} />
+                    )}
+
+                    <span
+                      style={{
+                        fontSize: 12,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        flex: 1
+                      }}
+                    >
+                      {file.name}
+                    </span>
+
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      title="Dosyayı kaldır"
+                      onClick={() => removeAttachment(index)}
+                      style={{ flexShrink: 0 }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <textarea
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              placeholder="Bir şey sor veya bir fikir anlat..."
+              rows={1}
+            />
+
+            <div className="composer-tools">
+              <div className="composer-left">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.txt,.jpg,.jpeg,.png,.webp,application/pdf,text/plain,image/jpeg,image/png,image/webp"
+                  multiple
+                  hidden
+                  onChange={e => handleFiles(e.target.files)}
+                />
+
+                <button
+                  type="button"
+                  className="tool-btn"
+                  title="Dosya veya görsel ekle"
+                  disabled={busy || attachments.length >= MAX_FILES}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip size={16} />
+                </button>
+
+                <button
+                  className={`tool-btn ${voice ? "active" : ""}`}
+                  onClick={() => setVoice(!voice)}
+                  title="Yanıtları seslendir"
+                >
+                  <Volume2 size={16} />
+                </button>
+
+                <button
+                  className="tool-btn"
+                  onClick={dictate}
+                  title="Sesle yaz"
+                >
+                  <Mic size={16} />
+                </button>
+
+                <span className="voice-state">
+                  {voice ? "SES AKTİF" : "NEXUS HAZIR"}
+                </span>
+              </div>
+
+              <span className="composer-hint">
+                Enter gönder · Shift+Enter satır
+              </span>
+
+              <button
+                className="send-btn"
+                disabled={
+                  (!input.trim() && attachments.length === 0) || busy
+                }
+                onClick={() => send()}
+              >
+                <Send size={16} />
+              </button>
+            </div>
+          </div>
+
+          <div className="composer-footer">
+            <span>
+              <ShieldCheck size={12} /> {cloudStatus}
+            </span>
+            <span>
+              POWERED BY {modelInfo.provider.toUpperCase()}
+            </span>
+          </div>
+
+          {status && (
+            <div className="status-msg">{status}</div>
+          )}
+        </div>
+      </section>
+
+      {settings && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setSettings(false)}
+        >
+          <div
+            className="settings-modal"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="settings-top">
+              <div>
+                <div className="settings-kicker">
+                  CONTROL CENTER
+                </div>
+                <h2>NEXUS ayarları</h2>
+                <p>
+                  Deneyimini kendi çalışma tarzına göre düzenle.
+                </p>
+              </div>
+
+              <button
+                className="icon-btn close-settings"
+                onClick={() => setSettings(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="settings-layout">
+              <nav className="settings-nav">
+                <button
+                  className={settingsTab === "general" ? "active" : ""}
+                  onClick={() => setSettingsTab("general")}
+                >
+                  <SlidersHorizontal size={16} /> Genel
+                </button>
+
+                <button
+                  className={settingsTab === "personal" ? "active" : ""}
+                  onClick={() => setSettingsTab("personal")}
+                >
+                  <Brain size={16} /> Kişiselleştirme
+                </button>
+
+                <button
+                  className={settingsTab === "system" ? "active" : ""}
+                  onClick={() => setSettingsTab("system")}
+                >
+                  <Activity size={16} /> Sistem
+                </button>
+              </nav>
+
+              <div className="settings-content">
+                {settingsTab === "general" && (
+                  <>
+                    <div className="section-title">
+                      YANIT TERCİHLERİ
+                    </div>
+
+                    <label className="setting-label">
+                      Cevap uzunluğu
+                    </label>
+
+                    <div className="choice-row">
+                      <button
+                        className={prefs.style === "concise" ? "chosen" : ""}
+                        onClick={() =>
+                          setPrefs(p => ({ ...p, style: "concise" }))
+                        }
+                      >
+                        Kısa
+                      </button>
+
+                      <button
+                        className={prefs.style === "balanced" ? "chosen" : ""}
+                        onClick={() =>
+                          setPrefs(p => ({ ...p, style: "balanced" }))
+                        }
+                      >
+                        Dengeli
+                      </button>
+
+                      <button
+                        className={prefs.style === "detailed" ? "chosen" : ""}
+                        onClick={() =>
+                          setPrefs(p => ({ ...p, style: "detailed" }))
+                        }
+                      >
+                        Detaylı
+                      </button>
+                    </div>
+
+                    <div className="setting-divider" />
+
+                    <div className="setting-label-row">
+                      <label className="setting-label">
+                        Yaratıcılık seviyesi
+                      </label>
+                      <b>{prefs.temperature}%</b>
+                    </div>
+
+                    <input
+                      className="range"
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={prefs.temperature}
+                      onChange={e =>
+                        setPrefs(p => ({
+                          ...p,
+                          temperature: Number(e.target.value)
+                        }))
+                      }
+                    />
+
+                    <div className="range-labels">
+                      <span>Daha tutarlı</span>
+                      <span>Daha yaratıcı</span>
+                    </div>
+
+                    <div className="setting-divider" />
+
+                    <div className="setting-label">
+                      Sesli yanıt
+                    </div>
+
+                    <button
+                      className={`toggle-row ${voice ? "enabled" : ""}`}
+                      onClick={() => setVoice(!voice)}
+                    >
+                      <span>
+                        <Volume2 size={17} />
+                        NEXUS yanıtlarını sesli okusun
+                      </span>
+                      <i />
+                    </button>
+                  </>
+                )}
+
+                {settingsTab === "personal" && (
+                  <>
+                    <div className="section-title">
+                      NEXUS HAFIZASI
+                    </div>
+
+                    <label className="setting-label">
+                      Kişisel bağlam
+                    </label>
+
+                    <textarea
+                      className="memory-input"
+                      value={prefs.memory}
+                      onChange={e =>
+                        setPrefs(p => ({
+                          ...p,
+                          memory: e.target.value
+                        }))
+                      }
+                      placeholder="NEXUS'un bilmesini istediğin tercihleri, hedeflerini veya çalışma şeklini yaz..."
+                    />
+
+                    <p className="modal-note">
+                      <Database size={13} />
+                      Kişisel hafızan hesabına bağlı olarak Supabase
+                      bulutunda saklanır ve yanıt oluşturulurken bağlam
+                      olarak kullanılır.
+                    </p>
+
+                    <div className="setting-divider" />
+
+                    <label className="setting-label">
+                      İletişim tarzı
+                    </label>
+
+                    <div className="choice-row tone-row">
+                      <button
+                        className={prefs.tone === "natural" ? "chosen" : ""}
+                        onClick={() =>
+                          setPrefs(p => ({ ...p, tone: "natural" }))
+                        }
+                      >
+                        Doğal
+                      </button>
+
+                      <button
+                        className={prefs.tone === "friendly" ? "chosen" : ""}
+                        onClick={() =>
+                          setPrefs(p => ({ ...p, tone: "friendly" }))
+                        }
+                      >
+                        Samimi
+                      </button>
+
+                      <button
+                        className={
+                          prefs.tone === "professional" ? "chosen" : ""
+                        }
+                        onClick={() =>
+                          setPrefs(p => ({ ...p, tone: "professional" }))
+                        }
+                      >
+                        Profesyonel
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {settingsTab === "system" && (
+                  <>
+                    <div className="section-title">
+                      SİSTEM DURUMU
+                    </div>
+
+                    <div className="system-card">
+                      <div className="system-icon">
+                        <Zap size={18} />
+                      </div>
+
+                      <div>
+                        <b>{modelInfo.provider}</b>
+                        <small>Aktif yapay zekâ sağlayıcısı</small>
+                      </div>
+
+                      <span
+                        className={`system-status ${
+                          modelInfo.configured ? "" : "inactive"
+                        }`}
+                      >
+                        {modelInfo.configured ? "YAPILANDI" : "KONTROL ET"}
+                      </span>
+                    </div>
+
+                    <div className="system-row">
+                      <span>Model</span>
+                      <b>{modelInfo.model}</b>
+                    </div>
+
+                    <div className="system-row">
+                      <span>API anahtarı</span>
+                      <b>
+                        {modelInfo.configured ? "Sunucuda tanımlı" : "Eksik"}
+                      </b>
+                    </div>
+
+                    <div className="system-row">
+                      <span>Sohbet depolama</span>
+                      <b>Supabase Cloud</b>
+                    </div>
+
+                    <div className="system-row">
+                      <span>Uygulama</span>
+                      <b>NEXUS AI 2.0</b>
+                    </div>
+
+                    <p className="modal-note">
+                      API anahtarın tarayıcıya gönderilmez. Sağlayıcı ve
+                      model bilgileri sunucu ortam değişkenlerinden okunur.
+                    </p>
+
+                    <button
+                      className="reset-button"
+                      onClick={() => {
+                        if (confirm("Tüm sohbetleri silmek istediğine emin misin?")) {
+                          localStorage.removeItem(`${STORE}_${userId}`);
+                          void supabase
+                            .from("nexus_chats")
+                            .delete()
+                            .eq("user_id", userId);
+
+                          const c = newChat();
+                          setChats([c]);
+                          setActive(c.id);
+                        }
+                      }}
+                    >
+                      <RotateCcw size={14} />
+                      Sohbet geçmişini temizle
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="settings-footer">
+              <span>
+                <Check size={13} />
+                Değişiklikler otomatik kaydedilir
+              </span>
+
+              <button
+                className="primary"
+                onClick={() => setSettings(false)}
+              >
+                Tamam
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
 }
