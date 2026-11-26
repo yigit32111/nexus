@@ -4,6 +4,11 @@ import { createClient } from "../../../utils/supabase/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const HF_IMAGE_MODELS = [
+  "black-forest-labs/FLUX.1-schnell",
+  "stabilityai/stable-diffusion-xl-base-1.0",
+];
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -21,64 +26,81 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Görsel açıklaması (prompt) gerekli." }, { status: 400 });
     }
 
-    const base = (process.env.AI_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/+$/, "");
-    const key = process.env.AI_API_KEY || process.env.GROQ_API_KEY;
-    const configuredImageModel = process.env.AI_IMAGE_MODEL || "";
+    const hfToken = (
+      process.env.HF_TOKEN ||
+      process.env.HUGGINGFACE_TOKEN ||
+      process.env.HG_TOKEN ||
+      ""
+    ).trim();
+
+    if (!hfToken) {
+      return NextResponse.json(
+        {
+          error:
+            "Sunucuda HF_TOKEN bulunamadı. Render -> Environment sekmesine 'HF_TOKEN' anahtarıyla Hugging Face token'ını ekleyip 'Save Changes' butonuna bas.",
+        },
+        { status: 400 }
+      );
+    }
 
     let imageUrl = "";
-    let usedModel = configuredImageModel || "flux";
+    let usedModel = "";
+    let lastError = "";
 
-    // 1) If OpenRouter or custom image model is configured, try provider image generation
-    if (key && (base.includes("openrouter.ai") || configuredImageModel)) {
-      const targetModel = configuredImageModel || "google/gemini-2.5-flash-image-preview";
-      usedModel = targetModel;
+    for (const modelId of HF_IMAGE_MODELS) {
+      const hfRes = await fetch(
+        `https://router.huggingface.co/hf-inference/models/${modelId}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${hfToken}`,
+            "Content-Type": "application/json",
+            "x-wait-for-model": "true",
+          },
+          body: JSON.stringify({ inputs: prompt }),
+          signal: AbortSignal.timeout(60000),
+        }
+      );
 
-      const response = await fetch(`${base}/chat/completions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-          ...(base.includes("openrouter.ai")
-            ? {
-                "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://nexus-ifn5.onrender.com",
-                "X-Title": "NEXUS AI 3.2",
-              }
-            : {}),
-        },
-        body: JSON.stringify({
-          model: targetModel,
-          messages: [{ role: "user", content: prompt }],
-          modalities: ["image", "text"],
-        }),
-        signal: AbortSignal.timeout(60000),
-      });
+      if (hfRes.ok) {
+        const contentType = hfRes.headers.get("content-type") || "image/png";
+        if (contentType.startsWith("image/")) {
+          const arrBuf = await hfRes.arrayBuffer();
+          imageUrl = `data:${contentType};base64,${Buffer.from(arrBuf).toString("base64")}`;
+          usedModel = modelId;
+          break;
+        }
+      } else {
+        const errText = await hfRes.text().catch(() => "");
+        try {
+          const parsed = JSON.parse(errText);
+          lastError = String(parsed?.error || `Hugging Face hatası (${hfRes.status})`);
+        } catch {
+          lastError = errText.slice(0, 220) || `Hugging Face hatası (${hfRes.status})`;
+        }
 
-      if (response.ok) {
-        const data = await response.json().catch(() => ({}));
-        const msg = data?.choices?.[0]?.message;
-        if (Array.isArray(msg?.images) && msg.images[0]?.image_url?.url) {
-          imageUrl = msg.images[0].image_url.url;
-        } else if (Array.isArray(msg?.content)) {
-          const imgPart = msg.content.find((p: any) => p?.type === "image_url" && p?.image_url?.url);
-          if (imgPart) imageUrl = imgPart.image_url.url;
+        // Token geçersiz veya yetkisiz ise diğer modelleri denemeye gerek yok
+        if (hfRes.status === 401 || hfRes.status === 403) {
+          lastError =
+            "Hugging Face token geçersiz veya 'Inference' yetkisi yok. Token ayarlarını kontrol et.";
+          break;
         }
       }
     }
 
-    // 2) Reliable fallback via Flux image endpoint if provider does not support image modality
     if (!imageUrl) {
-      const seed = Math.floor(Math.random() * 1_000_000);
-      imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
-        prompt
-      )}?width=1024&height=1024&seed=${seed}&nologo=true`;
-      usedModel = "flux-schnell";
+      return NextResponse.json(
+        {
+          error: `Hugging Face görsel üretemedi: ${lastError || "Bilinmeyen hata"}`,
+        },
+        { status: 502 }
+      );
     }
 
-    // Log image generation usage
     void supabase.from("nexus_usage_logs").insert({
       user_id: user.id,
       model: usedModel,
-      provider: "IMAGE",
+      provider: "HUGGINGFACE",
       feature: "image",
       prompt_tokens: Math.ceil(prompt.length / 4),
       completion_tokens: 1000,
@@ -91,6 +113,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("NEXUS IMAGE GEN ERROR", error);
-    return NextResponse.json({ error: "Görsel oluşturulurken hata oluştu." }, { status: 500 });
+    return NextResponse.json({ error: "Görsel oluşturulurken sunucu hatası oluştu." }, { status: 500 });
   }
 }
