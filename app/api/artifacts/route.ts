@@ -1,3 +1,4 @@
+import {readJsonLimited} from "../../../lib/core/request-guard";
 import {NextRequest,NextResponse} from "next/server";
 import {createClient} from "../../../utils/supabase/server";
 import {reserveRequest} from "../../../lib/core/budget";
@@ -6,7 +7,9 @@ export const runtime="nodejs";export const dynamic="force-dynamic";
 export async function POST(req:NextRequest){
  try{
   const db=await createClient();const {data:{user},error}=await db.auth.getUser();if(error||!user)return NextResponse.json({error:"Giriş gerekli"},{status:401});
-  const body=await req.json().catch(()=>null);const text: string=typeof body?.text==="string"?body.text:""; const format: string=typeof body?.format==="string"?body.format:"";
+  const parsedBody=await readJsonLimited(req,196608);
+    if(!parsedBody.ok)return NextResponse.json({error:parsedBody.error},{status:parsedBody.status});
+    const body=parsedBody.value;const text: string=typeof body?.text==="string"?body.text:""; const format: string=typeof body?.format==="string"?body.format:"";
   if(!text.trim()||text.length>24000||!["pdf","docx","xlsx","pptx","zip","csv","md","txt"].includes(format))return NextResponse.json({error:"Geçersiz içerik veya biçim."},{status:400});
   if(!await reserveRequest(user.id,"chat",0))return NextResponse.json({error:"Günlük kota doldu."},{status:429});
   let bytes:Uint8Array;let mime="application/octet-stream";

@@ -1,3 +1,4 @@
+import {readJsonLimited} from "../../../lib/core/request-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { writeUsageLog } from "../../../utils/supabase/admin";
@@ -88,7 +89,9 @@ export async function POST(req: NextRequest) {
       return fail("Çok fazla istek gönderildi. Lütfen bir dakika bekleyip tekrar dene.", 429);
     }
 
-    const body = await req.json().catch(() => null);
+    const parsedBody=await readJsonLimited(req,25165824);
+    if(!parsedBody.ok)return NextResponse.json({error:parsedBody.error},{status:parsedBody.status});
+    const body=parsedBody.value;
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return fail("İstek biçimi geçersiz.");
     }
@@ -150,7 +153,7 @@ export async function POST(req: NextRequest) {
         try {
           const pdfModule = await import("pdf-parse");
           const parse = (pdfModule as any).default ?? pdfModule;
-          const parsed = await parse(buffer);
+          const parsed = await parse(buffer,{max:50});
           extractedTexts.push(
             `PDF: ${file.name}\n${String(parsed?.text || "PDF metni okunamadı.").slice(
               0,
@@ -371,19 +374,19 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers,
       body: JSON.stringify(requestBody),
-      signal: AbortSignal.timeout(120000),
+      signal: AbortSignal.any([req.signal,AbortSignal.timeout(120000)]),
       cache: "no-store",
     });
 
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
-      const detail = String(payload?.error?.message || payload?.message || "").slice(0, 350);
+      // Do not forward upstream error details.
       const message =
         response.status === 401
           ? "AI sağlayıcı anahtarı geçersiz."
           : response.status === 429
           ? "AI sağlayıcısının hız sınırına ulaşıldı. Biraz sonra tekrar dene."
-          : detail || `AI sağlayıcı hatası (${response.status}).`;
+          : `AI sağlayıcı hatası (${response.status}).`;
       return NextResponse.json({ error: message }, { status: 502 });
     }
 
@@ -459,7 +462,7 @@ export async function POST(req: NextRequest) {
             }
           } finally {
             const completionTokensEst = estimateTokens(fullReply);
-            controller.enqueue(
+            try { controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
                   type: "usage",
@@ -472,16 +475,18 @@ export async function POST(req: NextRequest) {
               )
             );
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            } catch { /* client disconnected */ }
+            await reader.cancel().catch(()=>{});
             await writeUsageLog({
               user_id: user.id,
               model: effectiveModel,
               provider: isGroq ? "GROQ" : isOpenRouter ? "OPENROUTER" : "CUSTOM",
               feature: isLiveVoice ? "live" : ragSources.length ? "rag" : "chat",
-              prompt_tokens: promptTokensEst,
+              prompt_tokens: Number.isSafeInteger(providerUsage?.prompt_tokens)&&providerUsage.prompt_tokens>=0?providerUsage.prompt_tokens:promptTokensEst,
               completion_tokens: Number.isSafeInteger(providerUsage?.completion_tokens)&&providerUsage.completion_tokens>=0?providerUsage.completion_tokens:completionTokensEst,
               cost_microusd:reportedCost(providerUsage),
             });
-            controller.close();
+            try { controller.close(); } catch { /* already closed */ }
           }
         },
       });

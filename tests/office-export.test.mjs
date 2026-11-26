@@ -1,0 +1,4 @@
+import test from "node:test";import assert from "node:assert/strict";
+import ExcelJS from "exceljs";import PptxGenJS from "pptxgenjs";import JSZip from "jszip";
+test("XLSX generates and reads a Turkish text cell",async()=>{const w=new ExcelJS.Workbook();const s=w.addWorksheet("NEXUS");s.addRow(["İstanbul","Çığ",42]);const b=await w.xlsx.writeBuffer();const r=new ExcelJS.Workbook();await r.xlsx.load(b);assert.equal(r.getWorksheet("NEXUS").getCell("A1").value,"İstanbul");assert.equal(r.getWorksheet("NEXUS").getCell("C1").value,42)});
+test("PPTX generates a valid slide package with Turkish text",async()=>{const p=new PptxGenJS();p.layout="LAYOUT_WIDE";p.addSlide().addText("İstanbul Çığ",{x:.5,y:.5,w:8,h:1});const b=await p.write({outputType:"nodebuffer"});const zip=await JSZip.loadAsync(b);assert.ok(zip.file("[Content_Types].xml"));const xml=await zip.file("ppt/slides/slide1.xml").async("string");assert.ok(xml.includes("İstanbul Çığ"))});

@@ -1,3 +1,4 @@
+import {readJsonLimited} from "../../../lib/core/request-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { randomBytes } from "node:crypto";
@@ -16,7 +17,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Paylaşım oluşturmak için giriş yap." }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => null);
+    const parsedBody=await readJsonLimited(req,3145728);
+    if(!parsedBody.ok)return NextResponse.json({error:parsedBody.error},{status:parsedBody.status});
+    const body=parsedBody.value;
     if (!body || typeof body !== "object") {
       return NextResponse.json({ error: "Geçersiz paylaşım verisi." }, { status: 400 });
     }

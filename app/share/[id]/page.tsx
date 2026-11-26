@@ -34,7 +34,7 @@ export default async function SharedPage({
       <header className="share-topbar">
         <div className="share-brand">
           <Sparkles size={18} />
-          <b>NEXUS AI 3.2</b>
+          <b>NEXUS AI 3.3</b>
           <span>· Paylaşılan Çalışma</span>
         </div>
         <Link href="/" className="done-button" style={{ textDecoration: "none" }}>
@@ -60,8 +60,10 @@ export default async function SharedPage({
             {isHtmlLike && (
               <iframe
                 className="share-iframe"
-                sandbox="allow-scripts"
-                srcDoc={String(share.content)}
+                sandbox=""
+                referrerPolicy="no-referrer"
+                loading="lazy"
+                srcDoc={'<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; base-uri \'none\'; form-action \'none\'">'+String(share.content)}
                 title={share.title}
               />
             )}
