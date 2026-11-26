@@ -26,6 +26,7 @@ import {
 import { EMPTY_USAGE_STATS, MemoryCategory, ModelInfo, Prefs } from "../types/nexus";
 
 type SettingsModalProps = {
+  isAdmin: boolean;
   tab: "general" | "gems" | "memory" | "analytics" | "account" | "system";
   onChangeTab: (tab: "general" | "gems" | "memory" | "analytics" | "account" | "system") => void;
   onClose: () => void;
@@ -48,6 +49,7 @@ type SettingsModalProps = {
 };
 
 export function SettingsModal({
+  isAdmin,
   tab,
   onChangeTab,
   onClose,
@@ -104,7 +106,7 @@ export function SettingsModal({
       <section className="settings-dialog">
         <header className="settings-header">
           <div>
-            <div className="settings-eyebrow">NEXUS 3.2 CONTROL CENTER</div>
+            <div className="settings-eyebrow">NEXUS 3.3 AYARLAR</div>
             <h2>Ayarlar</h2>
             <p>Çalışma alanını, hafızanı ve kullanım istatistiklerini yönet.</p>
           </div>
@@ -150,6 +152,11 @@ export function SettingsModal({
             >
               <Activity size={16} /> Sistem
             </button>
+            {isAdmin && (
+              <button type="button" onClick={() => window.location.assign("/admin")}>
+                <ShieldCheck size={16} /> Yönetici Paneli
+              </button>
+            )}
           </nav>
 
           <div className="settings-content">

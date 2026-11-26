@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
+import { isCoreAdminId } from "../../../lib/core/permissions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +30,8 @@ export async function GET() {
   return NextResponse.json({
     model: process.env.AI_MODEL || "qwen/qwen3-vl-30b-a3b-instruct",
     provider,
+    isAdmin: isCoreAdminId(user.id),
+    accountId: user.id,
     configured: Boolean(process.env.AI_API_KEY || process.env.GROQ_API_KEY),
-  });
+  }, { headers: { "Cache-Control": "private, no-store" } });
 }

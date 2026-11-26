@@ -74,6 +74,7 @@ export default function Home() {
   const [modelsError, setModelsError] = useState("");
   const [provider, setProvider] = useState("AI SAĞLAYICISI");
   const [configured, setConfigured] = useState(false);
+  const [adminAccountId, setAdminAccountId] = useState("");
 
   const [files, setFiles] = useState<UploadAttachment[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -242,6 +243,7 @@ export default function Home() {
         const s = await statusResponse.json();
         setProvider(String(s.provider || "AI"));
         setConfigured(Boolean(s.configured));
+        setAdminAccountId(s.isAdmin === true ? String(s.accountId || "") : "");
         if (!hydrated.model && s.model) setPrefs((p) => ({ ...p, model: String(s.model) }));
       }
       if (modelResponse?.ok) {
@@ -1033,6 +1035,7 @@ export default function Home() {
 
       {showSettings && (
         <SettingsModal
+          isAdmin={Boolean(userId && adminAccountId === userId)}
           tab={settingsTab}
           onChangeTab={setSettingsTab}
           onClose={() => setShowSettings(false)}
