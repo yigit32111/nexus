@@ -31,5 +31,4 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-placeholder
       - name: Runtime dependency audit
-        run: npm audit --omit=dev --audit-level=high
-        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=moderate
