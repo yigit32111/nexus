@@ -1,12 +1,19 @@
-
 {
-  "name": "NEXUS AI",
+  "name": "NEXUS AI 3.0",
   "short_name": "NEXUS",
-  "description": "Personal AI Assistant",
+  "description": "Personal AI workspace",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#09090b",
-  "theme_color": "#09090b",
-  "orientation": "portrait"
+  "background_color": "#0a0c0f",
+  "theme_color": "#0a0c0f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }

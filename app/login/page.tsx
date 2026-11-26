@@ -1,20 +1,46 @@
-
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "../../utils/supabase/client";
 import { Sparkles, Mail, Lock, ArrowRight } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  const rawNext = searchParams.get("next");
+  const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+  const callbackError = searchParams.get("auth") === "callback_error";
 
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(
+    callbackError ? "Doğrulama bağlantısı geçersiz veya süresi dolmuş. Lütfen tekrar dene." : ""
+  );
+
+  async function handleReset() {
+    if (!email.trim()) {
+      setMessage("Şifre sıfırlama bağlantısı için e-posta adresini yaz.");
+      return;
+    }
+    setBusy(true);
+    setMessage("");
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      });
+      if (error) throw error;
+      setMessage("Şifre sıfırlama bağlantısı e-posta adresine gönderildiyse gelen kutunu kontrol et.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "İşlem tamamlanamadı.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,40 +50,38 @@ export default function LoginPage() {
     try {
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({
-          email,
+          email: email.trim(),
           password,
         });
 
         if (error) throw error;
 
-        router.replace("/");
+        router.replace(nextPath);
         router.refresh();
       } else {
-        if (password.length < 6) {
-          throw new Error("Şifre en az 6 karakter olmalı.");
+        if (password.length < 8) {
+          throw new Error("Şifre en az 8 karakter olmalı.");
         }
 
         const { data, error } = await supabase.auth.signUp({
-          email,
+          email: email.trim(),
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
         });
 
         if (error) throw error;
 
         if (data.session) {
-          router.replace("/");
+          router.replace(nextPath);
           router.refresh();
         } else {
           setMessage("Kayıt başarılı! E-posta adresine gelen doğrulama bağlantısına tıkla.");
         }
       }
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Bir hata oluştu."
-      );
+      setMessage(error instanceof Error ? error.message : "Bir hata oluştu.");
     } finally {
       setBusy(false);
     }
@@ -72,7 +96,9 @@ export default function LoginPage() {
           <div className="auth-orb">
             <Sparkles size={25} />
           </div>
-          <h1>NEXUS<span>AI</span></h1>
+          <h1>
+            NEXUS<span>AI</span>
+          </h1>
           <p>PERSONAL INTELLIGENCE SYSTEM</p>
         </div>
 
@@ -92,6 +118,7 @@ export default function LoginPage() {
             <Mail size={17} />
             <input
               type="email"
+              autoComplete="email"
               placeholder="ornek@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -104,24 +131,24 @@ export default function LoginPage() {
             <Lock size={17} />
             <input
               type="password"
-              placeholder="En az 6 karakter"
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              placeholder="En az 8 karakter"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              minLength={6}
+              minLength={8}
               required
             />
           </div>
 
-          {message && (
-            <div className="auth-message">{message}</div>
-          )}
+          {message && <div className="auth-message">{message}</div>}
 
-          <button className="auth-submit" disabled={busy}>
-            {busy
-              ? "İŞLEM YAPILIYOR..."
-              : mode === "login"
-              ? "GİRİŞ YAP"
-              : "HESAP OLUŞTUR"}
+          {mode === "login" && (
+            <button type="button" className="auth-forgot" onClick={handleReset} disabled={busy}>
+              Şifremi unuttum
+            </button>
+          )}
+          <button type="submit" className="auth-submit" disabled={busy}>
+            {busy ? "İŞLEM YAPILIYOR..." : mode === "login" ? "GİRİŞ YAP" : "HESAP OLUŞTUR"}
             <ArrowRight size={17} />
           </button>
         </form>
@@ -129,6 +156,7 @@ export default function LoginPage() {
         <div className="auth-switch">
           {mode === "login" ? "Henüz hesabın yok mu?" : "Zaten hesabın var mı?"}
           <button
+            type="button"
             onClick={() => {
               setMode(mode === "login" ? "register" : "login");
               setMessage("");
@@ -143,5 +171,13 @@ export default function LoginPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<main className="auth-shell" />}>
+      <LoginForm />
+    </Suspense>
   );
 }

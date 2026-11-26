@@ -568,3 +568,713 @@ button, input, textarea, select { font-family: inherit !important; }
   .message-row.user .message-content { font-size: 14px; }
   .message-row.user .message-toolbar { display: flex; }
 }
+
+
+/* NEXUS 3.0 — Code block header, inline code, recording & stop button polish */
+.inline-code {
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  font-family: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+}
+.code-block-wrap {
+  margin: 13px 0;
+  border: 1px solid #343434;
+  border-radius: 12px;
+  background: #141414;
+  overflow: hidden;
+}
+:root[data-theme="light"] .code-block-wrap {
+  background: #f5f5f5;
+  border-color: #dedede;
+}
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 13px;
+  border-bottom: 1px solid #2b2b2b;
+  background: #1b1b1b;
+  color: var(--muted-2);
+  font-size: 11px;
+  font-family: 'DM Mono', ui-monospace, monospace;
+}
+:root[data-theme="light"] .code-block-header {
+  background: #ebebec;
+  border-bottom-color: #dedede;
+}
+.code-block-header button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.code-block-header button:hover {
+  background: #2b2b2b;
+  color: var(--text);
+}
+:root[data-theme="light"] .code-block-header button:hover {
+  background: #dedede;
+}
+.code-block-wrap .code-block {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.composer-tools > button.recording {
+  background: #5c1b1b !important;
+  color: #ffd6d6 !important;
+}
+.composer-send button.stop-button {
+  background: #3a3a3a;
+  color: #ffffff;
+}
+/* =========================================================
+   NEXUS AI 3.1 — Gems, Canvas, Model Popover, Thinking & Tables
+   ========================================================= */
+
+.workspace-split {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Drag & Drop File Overlay */
+.drag-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+.drag-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 44px;
+  border: 2px dashed var(--accent);
+  border-radius: 20px;
+  background: var(--panel);
+  color: var(--text);
+}
+.drag-overlay-card span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Gems List in Sidebar */
+.gem-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.gem-item {
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+}
+.gem-item:hover,
+.gem-item.active {
+  background: var(--panel-3);
+}
+.gem-select {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: left;
+}
+.gem-item.active .gem-select,
+.gem-item:hover .gem-select {
+  color: var(--text);
+}
+.gem-select > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gem-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.gem-edit-btn {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  color: var(--muted-2);
+  opacity: 0;
+}
+.gem-item:hover .gem-edit-btn {
+  opacity: 1;
+}
+.topbar-gem-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+.active-gem-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 22px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  text-align: left;
+}
+.active-gem-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+.gem-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--accent);
+}
+.active-gem-banner h2 {
+  margin: 2px 0 4px;
+  font-size: 19px;
+}
+.active-gem-banner p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Searchable Model Switcher Popover */
+.model-switcher-wrap {
+  position: relative;
+  margin-right: 4px;
+}
+.model-switcher-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 230px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+}
+.model-switcher-btn:hover {
+  border-color: var(--accent);
+}
+.model-switcher-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(350px, 90vw);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  z-index: 50;
+  overflow: hidden;
+}
+.model-popover-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--muted);
+}
+.model-popover-search input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 12px;
+}
+.model-popover-filters {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.model-popover-filters button {
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.model-popover-filters button.active {
+  background: var(--panel-3);
+  color: var(--text);
+  font-weight: 600;
+}
+.model-popover-list {
+  max-height: 290px;
+  overflow: auto;
+  padding: 6px;
+}
+.model-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: left;
+}
+.model-option:hover,
+.model-option.selected {
+  background: var(--panel-2);
+}
+.model-option b {
+  display: block;
+  font-size: 12px;
+  color: var(--text);
+}
+.model-option small {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--muted-2);
+}
+.model-option-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+}
+.model-popover-empty {
+  padding: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted-2);
+}
+
+/* Thinking Accordion */
+.thinking-accordion {
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+.thinking-accordion-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.thinking-accordion-trigger:hover {
+  color: var(--text);
+}
+.pulse-icon {
+  color: var(--accent);
+  animation: pulseGlow 1.2s ease-in-out infinite;
+}
+@keyframes pulseGlow {
+  50% {
+    opacity: 0.35;
+  }
+}
+.thinking-accordion-body {
+  padding: 10px 13px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  max-height: 260px;
+  overflow: auto;
+}
+
+/* RichText Tables, Blockquotes, Links & Code Actions */
+.code-block-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rich-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin: 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.rich-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rich-table th,
+.rich-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+}
+.rich-table th {
+  background: var(--panel-2);
+  font-weight: 600;
+}
+.rich-table tr:last-child td {
+  border-bottom: 0;
+}
+.rich-quote {
+  margin: 10px 0;
+  padding: 6px 14px;
+  border-left: 3px solid var(--accent);
+  background: var(--panel-2);
+  border-radius: 0 8px 8px 0;
+  color: var(--muted);
+}
+.rich-hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 16px 0;
+}
+.rich-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Gemini-style Response Modifier Pills */
+.refine-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.refine-pills > span {
+  font-size: 11px;
+  color: var(--muted-2);
+  margin-right: 2px;
+}
+.refine-pills button {
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 11px;
+  transition: 0.15s;
+}
+.refine-pills button:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* NEXUS Canvas Split-Screen Panel */
+.active-icon-btn {
+  background: var(--panel-3) !important;
+  color: var(--accent) !important;
+}
+.canvas-panel {
+  width: 46%;
+  min-width: 360px;
+  max-width: 720px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+}
+.canvas-header {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.canvas-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  color: var(--accent);
+}
+.canvas-title-input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+}
+.canvas-lang-badge {
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.canvas-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.canvas-tabs {
+  display: flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  margin-right: 4px;
+}
+.canvas-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.canvas-tabs button.active {
+  background: var(--panel-3);
+  color: var(--text);
+  font-weight: 600;
+}
+.canvas-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.canvas-editor {
+  width: 100%;
+  height: 100%;
+  padding: 18px;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "DM Mono", ui-monospace, monospace !important;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.canvas-preview-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #ffffff;
+}
+.canvas-footer {
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 11px;
+  color: var(--muted-2);
+}
+.canvas-ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+.canvas-ai-btn:hover {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* Gem Modal */
+.gem-dialog {
+  width: min(520px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.gem-form {
+  padding: 18px 24px 22px;
+}
+.gem-name-row {
+  display: flex;
+  gap: 10px;
+}
+.gem-icon-picker {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+}
+.gem-icon-picker button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--muted);
+}
+.gem-icon-picker button.active {
+  background: var(--panel-3);
+  color: var(--accent);
+}
+.gem-name-row input,
+.gem-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--panel-2);
+  font-size: 12px;
+}
+.gem-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+
+@media (max-width: 960px) {
+  .canvas-panel {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    z-index: 35;
+  }
+} 
+  /* =========================================================
+   NEXUS AI 3.1 — Araç Çubuğu Hizalama ve Hover Kayma Düzeltmesi
+   ========================================================= */
+
+/* 1. Alt bardaki "Web" ve "Kod" butonlarının ikon + metin yatay hizası */
+.composer-tools .composer-tool-toggle {
+  width: auto !important;
+  min-width: unset !important;
+  height: 34px;
+  padding: 0 11px;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.composer-tools .composer-tool-toggle svg {
+  flex-shrink: 0;
+}
+
+.composer-tools .composer-tool-toggle.active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+/* 2. Kullanıcı mesajı üzerine gelince balonun büyümesini ve alttaki mesajı kaydırmasını engelle */
+.message-row.user,
+.message-row.user:hover,
+.user-message-main,
+.user-message-main:hover {
+  background: transparent !important;
+}
+
+.message-row.user .message-bubble,
+.message-row.user:hover .message-bubble {
+  padding: 11px 15px !important;
+  transform: none !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease !important;
+}
+
+/* Araç çubuğu yüksekliğini sabit tut (display:none yerine opacity kullan) */
+.message-row .message-toolbar {
+  display: flex !important;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  min-height: 28px;
+  margin-top: 4px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.message-row:hover .message-toolbar,
+.message-row:focus-within .message-toolbar {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* 3. Kullanıcı mesajındaki Kopyala / Düzenle butonlarını yalnızca ikon kutusu yap */
+.user-message-toolbar {
+  justify-content: flex-end;
+}
+
+.user-message-toolbar button {
+  width: 28px;
+  height: 28px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+}
