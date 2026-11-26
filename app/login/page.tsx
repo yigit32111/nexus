@@ -5,6 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "../../utils/supabase/client";
 import { Sparkles, Mail, Lock, ArrowRight } from "lucide-react";
 
+function getSiteUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/+$/, "");
+  if (configuredUrl) return configuredUrl;
+  if (typeof window !== "undefined") return window.location.origin;
+  return "";
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -30,8 +37,9 @@ function LoginForm() {
     setBusy(true);
     setMessage("");
     try {
+      const siteUrl = getSiteUrl();
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+        redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
       });
       if (error) throw error;
       setMessage("Şifre sıfırlama bağlantısı e-posta adresine gönderildiyse gelen kutunu kontrol et.");
@@ -63,11 +71,12 @@ function LoginForm() {
           throw new Error("Şifre en az 8 karakter olmalı.");
         }
 
+        const siteUrl = getSiteUrl();
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: `${siteUrl}/auth/callback`,
           },
         });
 
