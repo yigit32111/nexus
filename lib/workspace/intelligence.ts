@@ -1,0 +1,29 @@
+export function words(text:string){return Array.from(new Set(text.toLocaleLowerCase("tr-TR").match(/[\p{L}\p{N}]{3,}/gu)||[])).slice(0,100)}
+export function relevantMemory(memory:string,query:string){
+ const q=words(query);const lines=Array.from(new Set(memory.slice(0,24000).split("\n").map(x=>x.trim()).filter(Boolean)));
+ return lines.map(text=>({text,score:q.filter(w=>words(text).some(t=>t===w||t.startsWith(w)||w.startsWith(t))).length})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,8).map(x=>x.text).join("\n").slice(0,3000);
+}
+export function summarizeHistory(messages:{role:string;content:string}[]){
+ return messages.slice(-18).map(m=>m.role+": "+m.content.replace(/\s+/g," ").slice(0,180)).join("\n").slice(0,2200);
+}
+export function runMiniCode(source:string){
+ if(source.length>4000)throw Error("Kod çok uzun.");
+ const vars=new Map<string,number>();const output:string[]=[];
+ const lines=source.split("\n").filter(x=>x.trim()&&!x.trim().startsWith("#"));
+ if(lines.length>60)throw Error("En fazla 60 satır.");
+ function expr(s:string){
+  const ts=s.match(/\d+(?:\.\d+)?|[A-Za-z_][A-Za-z0-9_]*|[()+\-*/%]/g)||[];
+  if(ts.join("")!==s.replace(/\s/g,"")||ts.length>100)throw Error("Geçersiz ifade");
+  let i=0;
+  function atom():number{const t=ts[i++];if(t==="("){const v=add();if(ts[i++]!==")")throw Error("Parantez hatası");return v}if(t==="+"||t==="-")return(t==="-"?-1:1)*atom();if(t&&/^\d/.test(t))return Number(t);if(t&&vars.has(t))return vars.get(t)!;throw Error("Bilinmeyen değer: "+(t||""))}
+  function mul():number{let v=atom();while(["*","/","%"].includes(ts[i])){const op=ts[i++],r=atom();v=op==="*"?v*r:op==="/"?v/r:v%r}return v}
+  function add():number{let v=mul();while(ts[i]==="+"||ts[i]==="-"){const op=ts[i++],r=mul();v=op==="+"?v+r:v-r}return v}
+  const v=add();if(i!==ts.length||!Number.isFinite(v)||Math.abs(v)>1e15)throw Error("Geçersiz sonuç");return v;
+ }
+ for(const line of lines){const s=line.trim();const pr=s.match(/^print\((.*)\)$/),assign=s.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/);if(pr)output.push(String(expr(pr[1])));else if(assign)vars.set(assign[1],expr(assign[2]));else output.push(String(expr(s)))}
+ return output.join("\n");
+}
+export type Bar={label:string;value:number};
+export function parseChart(raw:string):{title:string;bars:Bar[]}|null {
+ try{const x=JSON.parse(raw);if(!x||typeof x.title!=="string"||!Array.isArray(x.bars)||x.bars.length<1||x.bars.length>20)return null; if(x.bars.some((b:any)=>!b||typeof b.label!=="string"||typeof b.value!=="number"||!Number.isFinite(b.value)||b.value<0||b.value>1e12))return null;return {title:x.title.slice(0,120),bars:x.bars.map((b:Bar)=>({label:b.label.slice(0,60),value:b.value}))}}catch{return null}
+}

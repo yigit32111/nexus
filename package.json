@@ -1,13 +1,13 @@
 {
   "name": "nexus-ai-3",
-  "version": "3.3.0-alpha.1",
+  "version": "3.3.0-beta.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --experimental-strip-types --test tests/model-policy.test.mjs"
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -16,7 +16,11 @@
     "next": "^16.4.6",
     "pdf-parse": "^1.1.1",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "docx": "9.15.4",
+    "exceljs": "4.4.0",
+    "pptxgenjs": "4.0.1",
+    "jszip": "3.10.1"
   },
   "devDependencies": {
     "@types/node": "^22",

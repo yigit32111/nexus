@@ -18,16 +18,26 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
   const [muted, setMuted] = useState(false);
 
   const recognitionRef = useRef<any>(null);
+  const [language,setLanguage]=useState("tr-TR");
+  const [rate,setRate]=useState(1);
+  const generation=useRef(0);
+  const sendRef=useRef(onSendVoiceMessage);sendRef.current=onSendVoiceMessage;
+  const timer=useRef<number|null>(null);
   const activeRef = useRef(open);
   activeRef.current = open;
 
   const stopAllAudio = useCallback(() => {
+    generation.current++;
+    if(timer.current!==null){window.clearTimeout(timer.current);timer.current=null;}
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.stop();
+        recognitionRef.current.onend=null;
+        recognitionRef.current.onerror=null;
+        recognitionRef.current.onresult=null;
+        recognitionRef.current.abort();
       } catch {
         /* ignore */
       }
@@ -46,7 +56,8 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
 
     stopAllAudio();
     const rec = new Speech();
-    rec.lang = "tr-TR";
+    const turn=generation.current;
+    rec.lang = language;
     rec.interimResults = true;
     rec.maxAlternatives = 1;
     recognitionRef.current = rec;
@@ -68,14 +79,15 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
     };
 
     rec.onend = async () => {
+      if(turn!==generation.current)return;
       recognitionRef.current = null;
       const clean = finalSpeech.trim();
       if (!activeRef.current || muted) return;
 
       if (!clean) {
         // Restart listening loop seamlessly if silence occurred
-        window.setTimeout(() => {
-          if (activeRef.current && !muted) startListening();
+        timer.current=window.setTimeout(() => {
+          if (turn===generation.current && activeRef.current && !muted) startListening();
         }, 300);
         return;
       }
@@ -84,8 +96,8 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
       setUserTranscript(clean);
 
       try {
-        const reply = await onSendVoiceMessage(clean);
-        if (!activeRef.current) return;
+        const reply = await sendRef.current(clean);
+        if (!activeRef.current || turn!==generation.current) return;
         const plainReply = reply.replace(/[*#`>_]/g, "").trim();
         setAiResponse(plainReply);
         setStatus("speaking");
@@ -93,16 +105,16 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
         if ("speechSynthesis" in window) {
           window.speechSynthesis.cancel();
           const utterance = new SpeechSynthesisUtterance(plainReply);
-          utterance.lang = "tr-TR";
-          utterance.rate = 1.04;
+          utterance.lang = language;
+          utterance.rate = rate;
           utterance.onend = () => {
-            if (activeRef.current && !muted) {
+            if (turn===generation.current && activeRef.current && !muted) {
               setUserTranscript("");
               startListening();
             }
           };
           utterance.onerror = () => {
-            if (activeRef.current && !muted) startListening();
+            if (turn===generation.current && activeRef.current && !muted) startListening();
           };
           window.speechSynthesis.speak(utterance);
         } else {
@@ -110,12 +122,13 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
         }
       } catch {
         setAiResponse("Bağlantı sırasında bir sorun oluştu, tekrar dinliyorum.");
-        if (activeRef.current && !muted) startListening();
+        if (turn===generation.current && activeRef.current && !muted) startListening();
       }
     };
 
     rec.onerror = () => {
-      recognitionRef.current = null;
+      if(turn!==generation.current)return;
+      rec.onend=null; recognitionRef.current=null; setMuted(true);setStatus("muted");setAiResponse("Mikrofon veya konuşma tanıma kullanılamadı. İzinleri kontrol edip yeniden aç.");
     };
 
     try {
@@ -123,7 +136,7 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
     } catch {
       /* ignore */
     }
-  }, [muted, onSendVoiceMessage, stopAllAudio]);
+  }, [muted, language, rate, stopAllAudio]);
 
   useEffect(() => {
     if (open && !muted) {
@@ -140,7 +153,7 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
     <div className="live-voice-overlay">
       <div className="live-voice-header">
         <span className="live-badge">
-          <Radio size={14} /> NEXUS LIVE
+          <Radio size={14} /> NEXUS LIVE 2.0
         </span>
       </div>
 
@@ -163,6 +176,7 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
         <p className="live-ai-caption">{aiResponse}</p>
       </div>
 
+      <div style={{display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap"}}><select aria-label="Konuşma dili" value={language} onChange={e=>setLanguage(e.target.value)}><option value="tr-TR">Türkçe</option><option value="en-US">English</option><option value="de-DE">Deutsch</option></select><label>Hız <input type="range" min=".7" max="1.4" step=".1" value={rate} onChange={e=>setRate(Number(e.target.value))}/></label><button type="button" onClick={()=>{stopAllAudio();if(!muted)startListening()}}>Yanıtı kes</button></div>
       <div className="live-voice-controls">
         <button
           type="button"

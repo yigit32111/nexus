@@ -152,6 +152,7 @@ export function SettingsModal({
             >
               <Activity size={16} /> Sistem
             </button>
+            <button type="button" onClick={()=>window.location.assign("/workspace")}><Globe size={16}/> Çalışma alanı</button>
             {isAdmin && (
               <button type="button" onClick={() => window.location.assign("/admin")}>
                 <ShieldCheck size={16} /> Yönetici Paneli
