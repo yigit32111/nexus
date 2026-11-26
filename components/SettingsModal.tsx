@@ -235,6 +235,7 @@ export function SettingsModal({
                   onChange={(e) => onUpdatePrefs((p) => ({ ...p, model: e.target.value }))}
                 >
                   <option value="">Sunucu varsayılanı</option>
+                  <option value="auto">NEXUS Auto (ücretsiz)</option>
                   {models.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}

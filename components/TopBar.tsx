@@ -66,7 +66,7 @@ export function TopBar({
   }, [dropdownOpen]);
 
   const currentModel = models.find((m) => m.id === selectedModelId);
-  const displayModelName = currentModel?.name || selectedModelId || `${provider} Varsayılan`;
+  const displayModelName = selectedModelId==="auto"?"NEXUS Auto":currentModel?.name || selectedModelId || `${provider} Varsayılan`;
 
   const filteredModels = models.filter((m) => {
     if (filter === "free" && !m.free) return false;
@@ -160,6 +160,7 @@ export function TopBar({
                   {selectedModelId === "" && <Check size={14} />}
                 </button>
 
+                <button type="button" className={`model-option ${selectedModelId==="auto"?"selected":""}`} onClick={()=>{onSelectModel("auto");setDropdownOpen(false);}}><div><b>NEXUS Auto</b><small>Ücretsiz uygun modeli sunucu seçer</small></div>{selectedModelId==="auto"&&<Check size={14}/>}</button>
                 {filteredModels.map((m) => (
                   <button
                     key={m.id}

@@ -12,7 +12,7 @@ export function createAdminClient() {
 // Usage analytics are not a financial ledger.
 export async function writeUsageLog(row: {
   user_id: string; model: string; provider: string; feature: string;
-  prompt_tokens: number; completion_tokens: number;
+  prompt_tokens: number; completion_tokens: number; cost_microusd?:number;
 }) {
   try {
     const { error } = await createAdminClient().from("nexus_usage_logs").insert(row);
