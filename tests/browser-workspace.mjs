@@ -82,7 +82,7 @@ try {
   });
   await page.getByTitle("Sesle yaz",{exact:true}).click();
   await page.evaluate(()=>window.testRecognizer.onresult({results:[[{transcript:"Merhaba"}],[{transcript:"Nexus"}]]}));
-  assert.equal(await page.locator("textarea").first().inputValue(),"Merhaba Nexus");
+  await page.waitForFunction(() => document.querySelector(".composer-box textarea")?.value === "Merhaba Nexus", undefined, {timeout:5000});
   await page.getByTitle("Kaydı durdur",{exact:true}).click();
   await page.getByTitle("NEXUS Live — Tam ekran eller serbest sesli sohbet").click();
   await page.getByRole("button",{name:"Mikrofonu aç",exact:true}).click();
