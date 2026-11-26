@@ -105,6 +105,7 @@ export type Prefs = {
   historyRecall: boolean;
   style: "balanced" | "concise" | "detailed";
   tone: "natural" | "friendly" | "professional";
+  thinkingMode: "fast" | "balanced" | "deep";
   temperature: number;
   model: string;
   theme: "dark" | "light";
@@ -171,6 +172,7 @@ export const DEFAULT_PREFS: Prefs = {
   historyRecall: false,
   style: "balanced",
   tone: "natural",
+  thinkingMode: "balanced",
   temperature: 0.7,
   model: "",
   theme: "dark",

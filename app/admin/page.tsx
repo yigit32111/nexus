@@ -18,13 +18,15 @@ export default async function AdminPage(){
   const sum=(key:string)=>data.reduce((a,r)=>a+Number((r as Record<string,unknown>)[key]||0),0);
   const usd=(v:number)=>"$"+(v/1e6).toFixed(4);
   return <main style={{maxWidth:850,margin:"auto",padding:24,color:"#e2e8f0",background:"#10151e",minHeight:"100vh",overflowY:"auto"}}>
-    <Link href="/" style={{color:"#93c5fd"}}>← NEXUS</Link><h1>NEXUS Control Center</h1>
+    <Link href="/" style={{color:"#93c5fd"}}>← NEXUS</Link><h1>NEXUS Admin Center 2.0</h1>
     <p>UTC gün: {day} · Salt okunur yönetim · Rezervasyonlar tahmindir.</p>
+    <h2>Günlük kota durumu</h2>
     <p>Bugünkü istek: {sum("requests")} / {cfg.global_requests}</p>
     <p>Görsel denemesi: {sum("images")} / {cfg.global_images}</p>
     <p>Rezerve bütçe: {usd(sum("reserved_microusd"))} / {usd(Number(cfg.global_budget_microusd))}</p>
     <p>Bugün kota kullanan kullanıcı: {rows.count??data.length}</p>
     <p>Bugünkü kullanım logları: {logs.count??0}</p>
+    <p>Genel istek kotası: {sum("requests") >= Number(cfg.global_requests) ? "Doldu" : "Kullanılabilir"}</p>
     <h2>Kullanıcı limitleri</h2><p>İstek: {cfg.user_requests} · Görsel denemesi: {cfg.user_images} · Tahmini bütçe: {usd(Number(cfg.user_budget_microusd))}</p>
     <p>Ücretli AI: {cfg.paid_enabled?"Açık":"Kapalı"}</p>
     <p>Limitler yetkili Supabase yönetiminden düzenlenir. Görsel sağlayıcı masrafları ayrı izlenir. Kota muhasebesi gerçek fatura değildir.</p>

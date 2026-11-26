@@ -50,6 +50,7 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
     const w = window as any;
     const Speech = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!Speech) {
+      setStatus("muted");
       setAiResponse("Bu tarayıcı canlı ses tanımayı desteklemiyor (Chrome/Edge önerilir).");
       return;
     }
@@ -158,6 +159,7 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
       </div>
 
       <div className="live-voice-center">
+        <p>Konuşma tanıma tarayıcının ses servisini kullanabilir.</p>
         <div className={`live-orb ${status}`}>
           <div className="live-orb-ring" />
           <div className="live-orb-core">

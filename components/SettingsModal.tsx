@@ -236,6 +236,18 @@ export function SettingsModal({
 
                 <div className="setting-divider" />
                 <div className="settings-section-title">MODEL SEÇİMİ</div>
+                <label className="setting-label">
+                  Düşünme profili
+                  <select value={prefs.thinkingMode} onChange={e => {
+                    const mode = e.target.value;
+                    if (mode === "fast" || mode === "balanced" || mode === "deep")
+                      onUpdatePrefs(p => ({ ...p, thinkingMode: mode }));
+                  }}>
+                    <option value="fast">Hızlı</option>
+                    <option value="balanced">Dengeli</option>
+                    <option value="deep">Derin analiz</option>
+                  </select>
+                </label>
                 <label className="setting-label">Aktif model</label>
                 <select
                   className="settings-select"

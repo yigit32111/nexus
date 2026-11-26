@@ -607,6 +607,7 @@ export default function Home() {
             selectedModel?.vision === true || VISION_ID_RE.test(effectiveModelId),
           modelSupportsTemperature: supportsTemp,
           preferences: {
+            thinkingMode: prefs.thinkingMode,
             style: prefs.style,
             tone: prefs.tone,
             temperature: prefs.temperature,

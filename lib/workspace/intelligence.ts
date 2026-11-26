@@ -1,7 +1,15 @@
 export function words(text:string){return Array.from(new Set(text.toLocaleLowerCase("tr-TR").match(/[\p{L}\p{N}]{3,}/gu)||[])).slice(0,100)}
+const memoryStopWords = new Set(["bir", "için", "olan", "ile", "bunu", "bana", "çok", "daha", "şimdi", "what", "the", "and", "for", "this", "that", "you", "nasıl"]);
+
 export function relevantMemory(memory:string,query:string){
- const q=words(query);const lines=Array.from(new Set(memory.slice(0,24000).split("\n").map(x=>x.trim()).filter(Boolean)));
- return lines.map(text=>({text,score:q.filter(w=>words(text).some(t=>t===w||t.startsWith(w)||w.startsWith(t))).length})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,8).map(x=>x.text).join("\n").slice(0,3000);
+ const q=words(query).filter(word => !memoryStopWords.has(word));const lines=Array.from(new Set(memory.slice(0,24000).split("\n").map(x=>x.trim()).filter(Boolean)));
+ return lines.map(text => {
+   const tokens = words(text);
+   const score = q.reduce((total, word) => total + (tokens.includes(word) ? 3 :
+     tokens.some(token => Math.min(token.length, word.length) >= 5 &&
+       (token.startsWith(word) || word.startsWith(token))) ? 1 : 0), 0);
+   return { text, score };
+ }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,8).map(x=>x.text).join("\n").slice(0,3000);
 }
 export function summarizeHistory(messages:{role:string;content:string}[]){
  return messages.slice(-18).map(m=>m.role+": "+m.content.replace(/\s+/g," ").slice(0,180)).join("\n").slice(0,2200);

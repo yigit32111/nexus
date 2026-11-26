@@ -1,7 +1,7 @@
 name: NEXUS Alpha CI
 on:
   push:
-    branches: ["feature/nexus-3.3-alpha1"]
+    branches: ["feature/nexus-3.3-alpha1", "feature/nexus-4.0"]
   pull_request:
     branches: ["main"]
 permissions:
@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm test
       - run: npm run build
         env:
@@ -34,7 +34,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=moderate
       - name: Install browser engines
         run: npx playwright install --with-deps chromium webkit
-      - name: Live RC1 smoke test (anonymous only)
+      - name: Live 3.3 smoke test (anonymous only)
         run: node tests/smoke.mjs
         env:
           SMOKE_URL: https://nexus-ifn5.onrender.com
@@ -46,6 +46,7 @@ jobs:
           for i in {1..30}; do curl -fsS http://127.0.0.1:3001/login >/dev/null && break; sleep 1; done
           kill -0 "$pid"
           SMOKE_URL=http://127.0.0.1:3001 node tests/browser-smoke.mjs
+          SMOKE_URL=http://127.0.0.1:3001 node tests/browser-workspace.mjs
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-placeholder

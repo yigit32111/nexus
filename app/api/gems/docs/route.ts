@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       if(buffer.subarray(0,5).toString()!=="%PDF-")return NextResponse.json({error:"Geçersiz PDF."},{status:400});
       const pdfModule = await import("pdf-parse");
       const parse = (pdfModule as any).default ?? pdfModule;
-      const parsed = await parse(buffer,{max:50});
+      const parsed = await parse(Uint8Array.from(buffer),{max:50});
       fullText = String(parsed?.text || "");
     } else {
       fullText = buffer.toString("utf8");

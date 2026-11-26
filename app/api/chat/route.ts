@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { writeUsageLog } from "../../../utils/supabase/admin";
 import { estimateTokens } from "../../../lib/nexus-utils";
+import { thinkingProfile, canRetryFreeModel } from "../../../lib/core/chat-profiles";
 import { routeModel } from "../../../lib/core/model-router";
 import { reserveRequest, reportedCost } from "../../../lib/core/budget";
 import {relevantMemory,summarizeHistory,recallChats} from "../../../lib/workspace/intelligence";
@@ -153,7 +154,7 @@ export async function POST(req: NextRequest) {
         try {
           const pdfModule = await import("pdf-parse");
           const parse = (pdfModule as any).default ?? pdfModule;
-          const parsed = await parse(buffer,{max:50});
+          const parsed = await parse(Uint8Array.from(buffer),{max:50});
           extractedTexts.push(
             `PDF: ${file.name}\n${String(parsed?.text || "PDF metni okunamadı.").slice(
               0,
@@ -297,90 +298,84 @@ export async function POST(req: NextRequest) {
       return fail("Seçilen modelin görsel desteği doğrulanamadı. Görsel destekli bir model seç.");
     }
 
-    let effectiveModel =
-      imageParts.length && !selectedSupportsVision && process.env.AI_VISION_MODEL
-        ? process.env.AI_VISION_MODEL
-        : model;
+    let effectiveModel = model;
 
     const rawTemperature = Number(preferences.temperature ?? 0.7);
     const temperature = Number.isFinite(rawTemperature)
       ? Math.max(0, Math.min(1, rawTemperature))
       : 0.7;
 
-    const useWebSearch = preferences.webSearch === true;
+    const comparison = body.comparison === true;
+    const excludedModel = comparison && typeof body.excludeModel === "string" ? body.excludeModel.slice(0, 200) : undefined;
+    const useWebSearch = !comparison && preferences.webSearch === true;
+    const profile = thinkingProfile(preferences.thinkingMode);
+    const completionSystem = system + profile.instruction;
     const useCodeExecution = preferences.codeExecution === true;
-    const isGroq = base.includes("groq.com");
-    const isOpenRouter = base.includes("openrouter.ai");
 
     // Core routing uses server-verified provider metadata.
 
     const wantStream = body.stream !== false;
-    const textOnly=system+JSON.stringify(messages.map(m=>({role:m.role,content:Array.isArray(m.content)?m.content.filter(x=>x.type==="text"):m.content})));
+    const textOnly=completionSystem+JSON.stringify(messages.map(m=>({role:m.role,content:Array.isArray(m.content)?m.content.filter(x=>x.type==="text"):m.content})));
     const promptTokensEst = estimateTokens(textOnly);
-    let routed;
-    try {
-      routed=await routeModel({base,key,requested:requestedModel,defaultId:model==="auto"?(process.env.AI_MODEL||""):model,query:latestUserQuery,images:imageParts.length,inputTokens:Buffer.byteLength(textOnly)+imageParts.length*8192,web:useWebSearch});
-    } catch {
-      return fail("Model kataloğu veya uygun model bulunamadı. Otomatik ya da başka bir model seç.",503);
-    }
-    effectiveModel=routed.model.id;
-    if(useCodeExecution)return fail("Code Lab henüz etkin değil.",400);
-    if(!(await reserveRequest(user.id,"chat",routed.reserve)))return fail("Günlük kota doldu veya ücretli özellik kapalı.",429);
-
-    const requestBody: Record<string, any> = {
-      model: effectiveModel,
-      messages: [{ role: "system", content: system }, ...messages],
-      max_completion_tokens: 4096,
-      stream: wantStream,
-      provider: {max_price:routed.maxPrice},
-      usage: {include:true},
-      ...(useWebSearch?{plugins:[{id:"web",max_results:3}]}:{}),
+    const automatic = comparison || requestedModel === "auto";
+    const routing = {
+      base, key, requested: automatic ? "auto" : requestedModel,
+      defaultId: process.env.AI_MODEL || model,
+      query: latestUserQuery + profile.routingHint,
+      images: imageParts.length,
+      inputTokens: Buffer.byteLength(textOnly) + imageParts.length * 8192,
+      web: useWebSearch,
+      freeOnly: automatic,
+      exclude: excludedModel,
     };
+    const first = await routeModel(routing).catch(() => null);
+    if (!first) return fail("Uygun model bulunamadı.", 503);
+    if (useCodeExecution) return fail("Kod çalıştırmak için çalışma alanındaki Code Lab'i aç.", 400);
 
-    if (routed.model.supported.includes("temperature")) {
-      requestBody.temperature = temperature;
-    }
-
-    if (useCodeExecution) {
-      if (!isGroq || !/^openai\/gpt-oss-(20b|120b)$/.test(effectiveModel)) {
-        return fail("Kod çalıştırma aracı yalnızca Groq openai/gpt-oss-20b veya 120b ile desteklenir.");
-      }
-      requestBody.tools = [
-        ...(useWebSearch ? [{ type: "browser_search" }] : []),
-        { type: "code_interpreter" },
-      ];
-      requestBody.tool_choice = "required";
-      if (useWebSearch) requestBody.citation_options = "enabled";
-    } else if (useWebSearch && isGroq) {
-      if (!/^openai\/gpt-oss-(20b|120b)$/.test(effectiveModel)) {
-        return fail("Groq yerleşik web araması openai/gpt-oss-20b veya 120b gerektirir.");
-      }
-      requestBody.tools = [{ type: "browser_search" }];
-      requestBody.tool_choice = "required";
-      requestBody.citation_options = "enabled";
-    }
-
-    const headers: Record<string, string> = {
+    const headers = {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
+      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://nexus-ifn5.onrender.com",
+      "X-Title": "NEXUS",
     };
-    if (isOpenRouter) {
-      headers["HTTP-Referer"] =
-        process.env.NEXT_PUBLIC_APP_URL || "https://nexus-ifn5.onrender.com";
-      headers["X-Title"] = "NEXUS AI 3.2";
+    const signal = AbortSignal.any([req.signal, AbortSignal.timeout(120000)]);
+    async function complete(route: NonNullable<typeof first>) {
+      if (!(await reserveRequest(user!.id, "chat", route.reserve))) return null;
+      effectiveModel = route.model.id;
+      return fetch(`${base}/chat/completions`, {
+        method: "POST",
+        headers,
+        signal,
+        cache: "no-store",
+        redirect: "error",
+        body: JSON.stringify({
+          model: route.model.id,
+          messages: [{ role: "system", content: completionSystem }, ...messages],
+          max_completion_tokens: profile.maxTokens,
+          stream: wantStream,
+          provider: { max_price: route.maxPrice },
+          usage: { include: true },
+          ...(route.model.supported.includes("temperature") ? { temperature } : {}),
+          ...(useWebSearch ? { plugins: [{ id: "web", max_results: 3 }] } : {}),
+        }),
+      });
     }
 
-    const response = await fetch(`${base}/chat/completions`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(requestBody),
-      signal: AbortSignal.any([req.signal,AbortSignal.timeout(120000)]),
-      cache: "no-store",
-    });
+    let response = await complete(first);
+    if (!response) return fail("Günlük kota doldu veya ücretli özellik kapalı.", 429);
+    if (automatic && !comparison && !useWebSearch && !signal.aborted && canRetryFreeModel(response.status)) {
+      const fallback = await routeModel({ ...routing, exclude: first.model.id }).catch(() => null);
+      if (fallback) {
+        const next = await complete(fallback);
+        if (next) {
+          await response.body?.cancel().catch(() => {});
+          response = next;
+        }
+      }
+    }
 
     if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      // Do not forward upstream error details.
+      await response.body?.cancel().catch(() => {});
       const message =
         response.status === 401
           ? "AI sağlayıcı anahtarı geçersiz."
@@ -480,7 +475,7 @@ export async function POST(req: NextRequest) {
             await writeUsageLog({
               user_id: user.id,
               model: effectiveModel,
-              provider: isGroq ? "GROQ" : isOpenRouter ? "OPENROUTER" : "CUSTOM",
+              provider: "OPENROUTER",
               feature: isLiveVoice ? "live" : ragSources.length ? "rag" : "chat",
               prompt_tokens: Number.isSafeInteger(providerUsage?.prompt_tokens)&&providerUsage.prompt_tokens>=0?providerUsage.prompt_tokens:promptTokensEst,
               completion_tokens: Number.isSafeInteger(providerUsage?.completion_tokens)&&providerUsage.completion_tokens>=0?providerUsage.completion_tokens:completionTokensEst,
@@ -506,7 +501,7 @@ export async function POST(req: NextRequest) {
     await writeUsageLog({
       user_id: user.id,
       model: effectiveModel,
-      provider: isGroq ? "GROQ" : isOpenRouter ? "OPENROUTER" : "CUSTOM",
+      provider: "OPENROUTER",
       feature: isLiveVoice ? "live" : ragSources.length ? "rag" : "chat",
       prompt_tokens: Number.isSafeInteger(payload?.usage?.prompt_tokens) && payload.usage.prompt_tokens >= 0 ? payload.usage.prompt_tokens : promptTokensEst,
       completion_tokens: Number.isSafeInteger(payload?.usage?.completion_tokens) && payload.usage.completion_tokens >= 0 ? payload.usage.completion_tokens : estimateTokens(reply),
@@ -515,11 +510,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       reply,
       reasoning: choice?.message?.reasoning || "",
-      model: payload?.model || effectiveModel,
+      model: effectiveModel,
       ragSources,
     });
   } catch (error: any) {
-    console.error("NEXUS CHAT ERROR", error);
+    console.error("NEXUS CHAT ERROR");
     if (error?.name === "TimeoutError" || error?.name === "AbortError") {
       return fail("İstek zaman aşımına uğradı.", 504);
     }

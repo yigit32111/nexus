@@ -1,0 +1,61 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { chromium } from "playwright";
+
+const base = process.env.SMOKE_URL || "http://127.0.0.1:3001";
+const html = await readFile(".next/server/app/workspace.html", "utf8");
+const browser = await chromium.launch();
+try {
+  const context = await browser.newContext();
+  const user = { id: "00000000-0000-4000-8000-000000000001", aud: "authenticated", role: "authenticated" };
+  const session = { access_token: "fixture-token", refresh_token: "fixture-refresh", expires_at: Math.floor(Date.now() / 1000) + 3600, user };
+  await context.addCookies([{ name: "sb-example-auth-token", value: "base64-" + Buffer.from(JSON.stringify(session)).toString("base64url"), url: base }]);
+  const page = await context.newPage();
+  // Render the production client bundle with a fake session. The HTTP smoke suite tests the real middleware separately.
+  await page.route(base + "/workspace", route => route.fulfill({ contentType: "text/html", body: html }));
+  await page.route("https://example.supabase.co/**", route => route.fulfill({
+    headers: { "access-control-allow-origin": "*" },
+    json: route.request().url().includes("/auth/v1/user") ? user : [],
+  }));
+
+  const prompts = [];
+  await page.route(base + "/api/chat", route => {
+    const request = route.request().postDataJSON();
+    prompts.push(request);
+    return route.fulfill({ json: {
+      model: request.excludeModel ? "fixture/second" : "fixture/first",
+      reply: "Örnek yanıt " + prompts.length,
+    } });
+  });
+
+  await page.goto(base + "/workspace");
+  await page.getByRole("button", { name: "Multi-AI" }).click();
+  await page.getByLabel("Karşılaştırma sorusu").fill("Örnek konu");
+  await page.getByRole("button", { name: "İlk modeli çalıştır" }).click();
+  await page.getByRole("heading", { name: "fixture/first" }).waitFor();
+  await page.getByRole("button", { name: "İkinci modeli çalıştır" }).click();
+  await page.getByRole("heading", { name: "fixture/second" }).waitFor();
+  assert.equal(prompts[0].messages[0].content, prompts[1].messages[0].content);
+  assert.equal(prompts[1].excludeModel, "fixture/first");
+  assert.equal(prompts[1].preferences.memoryMode, "off");
+  await page.getByRole("button", { name: "Karşılaştırmalı özet oluştur" }).click();
+  await page.getByRole("button", { name: "Özeti dosyaya aktar" }).click();
+  assert.equal(await page.getByLabel("Dosya içeriği").inputValue(), "Örnek yanıt 3");
+
+  await page.getByRole("button", { name: "Agent Mode" }).click();
+  await page.getByLabel("Yazı konusu").fill("Bahçe");
+  await page.getByRole("button", { name: "Plan oluştur" }).click();
+  await page.getByRole("heading", { name: "Yazı planı" }).waitFor();
+  assert.equal(prompts.length, 4);
+  await page.getByRole("button", { name: "Planı onayla ve taslağı yaz" }).click();
+  await page.getByRole("heading", { name: "Yazı taslağı" }).waitFor();
+  assert.match(prompts[4].messages[0].content, /Örnek yanıt 4/);
+
+  await page.getByRole("button", { name: "Code Lab" }).click();
+  await page.getByLabel("Sayısal kod").fill("print(6*7)");
+  await page.getByRole("button", { name: "Çalıştır", exact: true }).click();
+  assert.equal(await page.locator("pre[aria-live]").textContent(), "42");
+  console.log("OK workspace browser: comparison, synthesis, artifact transfer, agent approval, Code Lab");
+} finally {
+  await browser.close();
+}

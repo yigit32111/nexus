@@ -1,8 +1,8 @@
 import "server-only";
-import {chooseModel,estimateReservation,parsePrice,type CatalogModel} from "./model-policy";
+import {chooseModel,estimateReservation,isFreeModel,parsePrice,type CatalogModel} from "./model-policy";
 let catalog:{expires:number; models:CatalogModel[]}|undefined;
 let loading:Promise<void>|undefined;
-export async function routeModel(args:{base:string;key:string;requested:string;defaultId:string;query:string;images:number;inputTokens:number;web:boolean}){
+export async function routeModel(args:{base:string;key:string;requested:string;defaultId:string;query:string;images:number;inputTokens:number;web:boolean;freeOnly?:boolean;exclude?:string}){
   if(new URL(args.base).origin!=="https://openrouter.ai")throw new Error("CORE_PROVIDER");
   if(!catalog||catalog.expires<Date.now()){
     if(!loading)loading=(async()=>{
@@ -23,7 +23,7 @@ export async function routeModel(args:{base:string;key:string;requested:string;d
     await loading;
   }
   if(!catalog)throw new Error("CORE_CATALOG");
-  const model=chooseModel(catalog.models,args.requested,args.defaultId,args.query,args.images,args.inputTokens);
+  const model=chooseModel(catalog.models.filter(m => m.id !== args.exclude && (!args.freeOnly || isFreeModel(m))),args.requested,args.defaultId,args.query,args.images,args.inputTokens);
   if(!model)throw new Error("CORE_MODEL");
   return {model,reserve:estimateReservation(model,args.inputTokens,args.images,args.web),maxPrice:{prompt:model.prompt*1e6,completion:model.completion*1e6,request:model.request,image:model.image}};
 }

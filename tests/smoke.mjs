@@ -6,3 +6,17 @@ for(const path of ["/login","/manifest.webmanifest","/icon.svg"]){const r=await 
 for(const path of ["/","/workspace","/admin"]){const r=await fetch(base+path,{redirect:"manual"});assert.ok([302,303,307,308,401,404].includes(r.status),path+" returned "+r.status);console.log("OK protected",path)}
 for(const path of ["/api/chat","/api/image","/api/artifacts","/api/research","/api/share","/api/gems/docs"]){const r=await fetch(base+path,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}",redirect:"manual"});assert.equal(r.status,401,path);console.log("OK unauthorized API",path)}
 for(const path of ["/api/status","/api/models","/api/gems/docs"]){const r=await fetch(base+path,{method:path.endsWith("/docs")?"DELETE":"GET",redirect:"manual"});assert.equal(r.status,401,path);console.log("OK unauthorized API",path)}
+
+for (const [path, body] of [
+  ["/api/chat", { comparison: true, excludeModel: "example/free", model: "auto", messages: [{ role: "user", content: "Örnek" }] }],
+  ["/api/research", { query: "Örnek", scope: "academic" }],
+]) {
+  const response = await fetch(base + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    redirect: "manual",
+  });
+  assert.equal(response.status, 401, path);
+  console.log("OK 4.0 authenticated-only operation", path);
+}
