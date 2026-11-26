@@ -8,14 +8,27 @@ export async function POST(req:NextRequest){
   const body=await req.json().catch(()=>null);const q=typeof body?.query==="string"?body.query.trim():"";
   if(q.length<3||q.length>200)return NextResponse.json({error:"3–200 karakterlik araştırma konusu gir."},{status:400});
   if(!await reserveRequest(user.id,"chat",0))return NextResponse.json({error:"Günlük kota doldu"},{status:429});
-  const results=await Promise.allSettled(["tr","en"].map(async lang=>{
+  const wikiTasks=["tr","en"].map(async lang=>{
    const params=new URLSearchParams({action:"query",generator:"search",gsrsearch:q,gsrlimit:"4",prop:"extracts",exintro:"1",explaintext:"1",exchars:"1000",format:"json",formatversion:"2"});
    const response=await fetch("https://"+lang+".wikipedia.org/w/api.php?"+params,{headers:{"User-Agent":"NEXUS/3.3 (https://nexus-ifn5.onrender.com)"},signal:AbortSignal.timeout(12000),cache:"no-store",redirect:"error"});
    if(!response.ok)throw Error("research source failed");const data=await response.json();
    return (Array.isArray(data?.query?.pages)?data.query.pages:[]).filter((r:any)=>Number.isSafeInteger(r.pageid)&&typeof r.title==="string"&&typeof r.extract==="string"&&r.extract.trim()).map((r:any)=>({title:r.title.slice(0,180),text:r.extract.slice(0,1000),url:"https://"+lang+".wikipedia.org/?curid="+r.pageid,lang}));
-  }));
-  const sources=results.flatMap(r=>r.status==="fulfilled"?r.value:[]).slice(0,8);
+  });
+  const crossrefTask=async()=>{
+    const params=new URLSearchParams({"query.bibliographic":q,rows:"5",select:"DOI,title,container-title,published,author"});
+    const r=await fetch("https://api.crossref.org/works?"+params,{headers:{"User-Agent":"NEXUS/3.3 (https://nexus-ifn5.onrender.com)"},cache:"no-store",signal:AbortSignal.timeout(12000),redirect:"error"});
+    if(!r.ok)throw Error("Crossref unavailable");
+    const data=await r.json();const items=Array.isArray(data?.message?.items)?data.message.items:[];
+    return items.filter((x:any)=>typeof x?.DOI==="string"&&/^10\.\d{4,9}\/[^\s]{1,220}$/.test(x.DOI)&&typeof x?.title?.[0]==="string").map((x:any)=>({
+     title:x.title[0].slice(0,180),
+     text:"Bibliyografik kayıt; tam metin okunmadı. Yayın: "+String(x["container-title"]?.[0]||"belirtilmemiş").slice(0,160)+". Yıl: "+String(x.published?.["date-parts"]?.[0]?.[0]||"bilinmiyor")+". Yazarlar: "+(Array.isArray(x.author)?x.author.slice(0,4).map((a:any)=>String(a.family||"").slice(0,80)).join(", "):"belirtilmemiş"),
+     url:"https://doi.org/"+encodeURIComponent(x.DOI),lang:"akademik"
+    }));
+  };
+  const results=await Promise.allSettled([...wikiTasks,crossrefTask()]);
+  const sources=Array.from(new Map<string,{title:string;text:string;url:string;lang:string}>(results.flatMap(r=>r.status==="fulfilled"?r.value:[]).map((s:any)=>[s.url,s])).values()).slice(0,13);
+  const unavailable=["Türkçe Vikipedi","İngilizce Vikipedi","Crossref"].filter((_,i)=>results[i].status==="rejected");
   if(!sources.length)return NextResponse.json({error:"Kaynak bulunamadı veya kaynak servisi yanıt vermedi."},{status:502});
-  return NextResponse.json({sources,coverage:"Türkçe ve İngilizce Vikipedi; bağımsız kaynak doğrulaması değildir."},{headers:{"Cache-Control":"no-store"}});
+  return NextResponse.json({sources,unavailable,coverage:"Vikipedi özetleri ve Crossref yayın kayıtları; yayınların tam metni okunmadı, bağımsız doğrulama yapılmadı."},{headers:{"Cache-Control":"no-store"}});
  }catch{return NextResponse.json({error:"Araştırma servisine ulaşılamadı."},{status:503})}
 }

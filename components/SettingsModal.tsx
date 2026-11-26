@@ -356,6 +356,8 @@ export function SettingsModal({
                   />
                 </label>
 
+                <label className="toggle-setting"><span><Brain size={16}/> Önceki sohbetleri hatırla</span><input type="checkbox" checked={prefs.historyRecall===true&&prefs.memoryMode==="hybrid"} disabled={prefs.memoryMode!=="hybrid"} onChange={e=>onUpdatePrefs(p=>({...p,historyRecall:e.target.checked}))}/></label>
+                <p className="settings-description">İsteğe bağlıdır. Akıllı modda ilgili eski sohbet parçaları AI sağlayıcısına gönderilebilir. Proje sohbetlerinde yalnızca aynı proje taranır. Kapattığında bu arama durur; eski sohbetlerin silinmez.</p>
                 <label className="setting-label">Hafıza modu</label>
                 <div className="segmented three memory-modes">
                   <button

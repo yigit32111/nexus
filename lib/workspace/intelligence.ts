@@ -27,3 +27,20 @@ export type Bar={label:string;value:number};
 export function parseChart(raw:string):{title:string;bars:Bar[]}|null {
  try{const x=JSON.parse(raw);if(!x||typeof x.title!=="string"||!Array.isArray(x.bars)||x.bars.length<1||x.bars.length>20)return null; if(x.bars.some((b:any)=>!b||typeof b.label!=="string"||typeof b.value!=="number"||!Number.isFinite(b.value)||b.value<0||b.value>1e12))return null;return {title:x.title.slice(0,120),bars:x.bars.map((b:Bar)=>({label:b.label.slice(0,60),value:b.value}))}}catch{return null}
 }
+
+export function recallChats(rows:unknown,query:string,currentId:string,projectId:string|null){
+ if(!Array.isArray(rows))return "";
+ const stop=new Set(["bir","için","olan","ile","bunu","bana","çok","daha","şimdi","what","the","and","for","this","that","you","nasıl"]);
+ const q=words(query).filter(w=>!stop.has(w));if(!q.length)return "";
+ const candidates:{text:string;score:number}[]=[];
+ for(const row of rows.slice(0,12)){
+  if(!row||typeof row.id!=="string"||row.id===currentId||(row.project_id??null)!==projectId||!Array.isArray(row.messages))continue;
+  for(const m of row.messages.slice(-24)){
+   if(!m||m.role!=="user"||typeof m.content!=="string")continue;
+   const content=m.content.slice(0,4000).replace(/\s+/g," ").trim();const tokens=words(content);
+   const score=q.filter(w=>tokens.some(t=>t===w||(w.length>=5&&t.startsWith(w)))).length;
+   if(score>0)candidates.push({text:String(row.title||"Sohbet").slice(0,100)+": "+content.slice(0,500),score});
+  }
+ }
+ return Array.from(new Set(candidates.sort((a,b)=>b.score-a.score).map(x=>x.text))).slice(0,4).join("\n").slice(0,2200);
+}
