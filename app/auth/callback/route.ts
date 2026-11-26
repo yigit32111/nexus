@@ -4,7 +4,8 @@ import { createClient } from "../../../utils/supabase/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  const requestedNext = searchParams.get("next");
+  const next = requestedNext === "/reset-password" ? requestedNext : "/";
 
   const forwardedHost = request.headers.get("x-forwarded-host");
   const appUrl =
@@ -19,5 +20,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${appUrl}/login?error=auth_callback_error`);
+  return NextResponse.redirect(`${appUrl}/login?auth=callback_error`);
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Sparkles } from "lucide-react";
-import { createClient } from "../../../utils/supabase/server";
+import { createAdminClient } from "../../../utils/supabase/admin";
 import { RichText } from "../../../components/RichText";
 
 export const dynamic = "force-dynamic";
@@ -12,11 +12,12 @@ export default async function SharedPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
+  if (!/^(?:[a-f0-9]{14}|[a-f0-9]{32})$/i.test(id)) notFound();
+  const supabase = createAdminClient();
 
   const { data: share, error } = await supabase
     .from("nexus_shares")
-    .select("*")
+    .select("title,share_type,language,content,messages,created_at")
     .eq("id", id)
     .maybeSingle();
 

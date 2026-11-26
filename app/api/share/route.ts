@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
-import { uid } from "../../../lib/nexus-utils";
+import { randomBytes } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,12 +21,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Geçersiz paylaşım verisi." }, { status: 400 });
     }
 
-    const shareId = uid().replace(/-/g, "").slice(0, 14);
+    const shareId = randomBytes(16).toString("hex");
     const shareType = body.shareType === "chat" ? "chat" : "canvas";
     const title = String(body.title || "NEXUS Paylaşımı").slice(0, 120);
     const language = String(body.language || "markdown").slice(0, 40);
     const content = String(body.content || "").slice(0, 100000);
-    const messages = Array.isArray(body.messages) ? body.messages.slice(0, 100) : [];
+    const messages = Array.isArray(body.messages)
+      ? body.messages.slice(0, 100).filter((m: any) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string").map((m: any) => ({ role: m.role, content: m.content.slice(0, 24000) }))
+      : [];
 
     const { error } = await supabase.from("nexus_shares").insert({
       id: shareId,

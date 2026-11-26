@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
+import { writeUsageLog } from "../../../utils/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    void supabase.from("nexus_usage_logs").insert({
+    await writeUsageLog({
       user_id: user.id,
       model: usedModel,
       provider: "HUGGINGFACE",
