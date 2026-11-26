@@ -1634,3 +1634,6 @@ button, input, textarea, select { font-family: inherit !important; }
 .admin-metrics div {padding:14px;border:1px solid #384354;border-radius:12px}
 .admin-metrics dt {font-size:13px;color:#b9c4d4}
 .admin-metrics dd {margin:6px 0 0;font-size:24px;font-variant-numeric:tabular-nums}
+
+.live-voice-controls .live-ctrl-btn {width:auto;min-width:52px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 16px;border-radius:999px}
+.live-voice-center > button {border:1px solid currentColor;border-radius:10px;padding:9px 14px}

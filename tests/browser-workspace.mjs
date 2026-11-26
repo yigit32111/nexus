@@ -73,6 +73,24 @@ try {
   await page.getByText("fixture-visible", {exact:true}).waitFor({state:"detached"});
   assert.equal(await page.getByText("fixture-archived",{exact:true}).count(),0);
   await page.locator(".chat-select").filter({hasText:"Yeni sohbet"}).waitFor();
+  await page.evaluate(() => {
+    window.SpeechRecognition=class {
+      start(){ window.testRecognizer=this;this.onstart?.(); }
+      stop(){ this.onend?.(); }
+      abort(){ this.onend?.(); }
+    };
+  });
+  await page.getByTitle("Sesle yaz",{exact:true}).click();
+  await page.evaluate(()=>window.testRecognizer.onresult({results:[[{transcript:"Merhaba"}],[{transcript:"Nexus"}]]}));
+  assert.equal(await page.locator("textarea").first().inputValue(),"Merhaba Nexus");
+  await page.getByTitle("Kaydı durdur",{exact:true}).click();
+  await page.getByTitle("NEXUS Live — Tam ekran eller serbest sesli sohbet").click();
+  await page.getByRole("button",{name:"Mikrofonu aç",exact:true}).click();
+  await page.getByText("Dinliyor…",{exact:true}).waitFor();
+  await page.evaluate(()=>window.testRecognizer.onerror({error:"not-allowed"}));
+  await page.getByText(/Mikrofon veya konuşma tanıma izni verilmedi/).waitFor();
+  await page.getByTitle("Canlı sohbeti bitir").click();
+  console.log("OK browser voice controls with simulated speech and permission failure");
   console.log("OK deleting the last visible chat opens a fresh conversation");
 } finally {
   await browser.close();

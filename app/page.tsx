@@ -30,6 +30,7 @@ import {
   titleFrom,
   uid,
 } from "../lib/nexus-utils";
+import { speechError, speechText } from "../lib/core/speech";
 import { Sidebar } from "../components/Sidebar";
 import { TopBar } from "../components/TopBar";
 import { MessageList } from "../components/MessageList";
@@ -755,31 +756,40 @@ export default function Home() {
     void send();
   }
 
+  useEffect(() => () => {
+    const rec = recognitionRef.current;
+    if (rec) { rec.onend = rec.onresult = rec.onerror = null; rec.abort(); }
+  }, []);
+
   function toggleDictate() {
     const w = window as any;
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      return;
+    }
     const Speech = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!Speech) {
-      setNotice("Bu tarayıcı sesle yazmayı desteklemiyor.");
+      textareaRef.current?.focus();
+      setNotice("Bu tarayıcıda klavyenin mikrofon tuşunu kullanarak yazdırabilirsin.");
       return;
     }
-    if (isRecording && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsRecording(false);
-      return;
-    }
-    const rec = new Speech();
-    rec.lang = "tr-TR";
-    rec.interimResults = false;
-    recognitionRef.current = rec;
-    setIsRecording(true);
-    rec.onresult = (event: any) =>
-      setInput((prev) => `${prev}${prev ? " " : ""}${event.results?.[0]?.[0]?.transcript || ""}`);
-    rec.onerror = () => setIsRecording(false);
-    rec.onend = () => {
-      setIsRecording(false);
+    try {
+      const rec = new Speech();
+      const prefix = input.trimEnd();
+      rec.lang = "tr-TR";
+      rec.interimResults = true;
+      recognitionRef.current = rec;
+      setNotice("");
+      rec.onstart = () => setIsRecording(true);
+      rec.onresult = (event: any) => setInput([prefix, speechText(event.results)].filter(Boolean).join(" "));
+      rec.onerror = (event: any) => { setIsRecording(false); setNotice(speechError(event.error)); };
+      rec.onend = () => { setIsRecording(false); recognitionRef.current = null; };
+      rec.start();
+    } catch (error) {
       recognitionRef.current = null;
-    };
-    rec.start();
+      setIsRecording(false);
+      setNotice(speechError(error instanceof Error ? error.name : ""));
+    }
   }
 
   if (loading || !userId) {
@@ -1025,7 +1035,7 @@ export default function Home() {
             }
             imageMode={imageMode}
             onToggleImageMode={() => setImageMode((v) => !v)}
-            onOpenLiveVoice={() => setLiveVoiceOpen(true)}
+            onOpenLiveVoice={() => { recognitionRef.current?.abort(); setLiveVoiceOpen(true); }}
             isGroqProvider={isGroqProvider}
             onEnhancePrompt={() => setInput(buildEnhancedPrompt(input))}
             modelLabel={effectiveModelId}

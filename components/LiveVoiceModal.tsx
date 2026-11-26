@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, MicOff, PhoneOff, Radio, Volume2 } from "lucide-react";
 
+import {speechError, speechText} from "../lib/core/speech";
+
 type LiveVoiceModalProps = {
   open: boolean;
   onClose: () => void;
@@ -11,24 +13,23 @@ type LiveVoiceModalProps = {
 
 export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceModalProps) {
   const [status, setStatus] = useState<"listening" | "thinking" | "speaking" | "muted">(
-    "listening"
+    "muted"
   );
   const [userTranscript, setUserTranscript] = useState("");
-  const [aiResponse, setAiResponse] = useState("Seni dinliyorum, konuşmaya başlayabilirsin…");
-  const [muted, setMuted] = useState(false);
+  const [aiResponse, setAiResponse] = useState("Başlamak için mikrofonu aç.");
+  const muted = status === "muted";
 
   const recognitionRef = useRef<any>(null);
   const [language,setLanguage]=useState("tr-TR");
   const [rate,setRate]=useState(1);
   const generation=useRef(0);
   const sendRef=useRef(onSendVoiceMessage);sendRef.current=onSendVoiceMessage;
-  const timer=useRef<number|null>(null);
+  const [lastReply,setLastReply]=useState("");
   const activeRef = useRef(open);
   activeRef.current = open;
 
   const stopAllAudio = useCallback(() => {
     generation.current++;
-    if(timer.current!==null){window.clearTimeout(timer.current);timer.current=null;}
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
@@ -46,7 +47,7 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
   }, []);
 
   const startListening = useCallback(() => {
-    if (!activeRef.current || muted) return;
+    if (!activeRef.current) return;
     const w = window as any;
     const Speech = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!Speech) {
@@ -56,50 +57,42 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
     }
 
     stopAllAudio();
-    const rec = new Speech();
+    let rec;
+    try { rec = new Speech(); } catch { setStatus("muted"); setAiResponse(speechError("")); return; }
     const turn=generation.current;
     rec.lang = language;
     rec.interimResults = true;
     rec.maxAlternatives = 1;
     recognitionRef.current = rec;
     setStatus("listening");
+    setAiResponse("");
+    setUserTranscript("");
 
-    let finalSpeech = "";
-
+    let transcript = "";
     rec.onresult = (event: any) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const piece = event.results[i][0]?.transcript || "";
-        if (event.results[i].isFinal) {
-          finalSpeech += piece + " ";
-        } else {
-          interim += piece;
-        }
-      }
-      setUserTranscript((finalSpeech + interim).trim());
+      if (turn !== generation.current) return;
+      transcript = speechText(event.results);
+      setUserTranscript(transcript);
     };
 
     rec.onend = async () => {
-      if(turn!==generation.current)return;
+      if (turn !== generation.current || !activeRef.current) return;
       recognitionRef.current = null;
-      const clean = finalSpeech.trim();
-      if (!activeRef.current || muted) return;
-
+      const clean = transcript.trim();
       if (!clean) {
-        // Restart listening loop seamlessly if silence occurred
-        timer.current=window.setTimeout(() => {
-          if (turn===generation.current && activeRef.current && !muted) startListening();
-        }, 300);
+        setAiResponse(speechError("no-speech"));
+        setStatus("muted");
         return;
       }
-
       setStatus("thinking");
       setUserTranscript(clean);
 
       try {
         const reply = await sendRef.current(clean);
         if (!activeRef.current || turn!==generation.current) return;
+        if (!reply.trim()) { setStatus("muted"); setAiResponse("Yanıt alınamadı. Tekrar konuşmak için mikrofonu aç."); return; }
         const plainReply = reply.replace(/[*#`>_]/g, "").trim();
+        setLastReply(plainReply);
         setAiResponse(plainReply);
         setStatus("speaking");
 
@@ -109,13 +102,13 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
           utterance.lang = language;
           utterance.rate = rate;
           utterance.onend = () => {
-            if (turn===generation.current && activeRef.current && !muted) {
+            if (turn===generation.current && activeRef.current) {
               setUserTranscript("");
               startListening();
             }
           };
           utterance.onerror = () => {
-            if (turn===generation.current && activeRef.current && !muted) startListening();
+            if (turn===generation.current && activeRef.current) setStatus("muted");
           };
           window.speechSynthesis.speak(utterance);
         } else {
@@ -123,30 +116,32 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
         }
       } catch {
         setAiResponse("Bağlantı sırasında bir sorun oluştu, tekrar dinliyorum.");
-        if (turn===generation.current && activeRef.current && !muted) startListening();
+        if (turn===generation.current && activeRef.current) startListening();
       }
     };
 
-    rec.onerror = () => {
-      if(turn!==generation.current)return;
-      rec.onend=null; recognitionRef.current=null; setMuted(true);setStatus("muted");setAiResponse("Mikrofon veya konuşma tanıma kullanılamadı. İzinleri kontrol edip yeniden aç.");
+    rec.onerror = (event: any) => {
+      if (turn !== generation.current) return;
+      stopAllAudio();
+      setStatus("muted");
+      setAiResponse(speechError(event.error));
     };
-
-    try {
-      rec.start();
-    } catch {
-      /* ignore */
+    try { rec.start(); } catch (err) {
+      stopAllAudio();
+      setStatus("muted");
+      setAiResponse(speechError(err instanceof Error ? err.name : ""));
     }
-  }, [muted, language, rate, stopAllAudio]);
+  }, [language, rate, stopAllAudio]);
 
   useEffect(() => {
-    if (open && !muted) {
-      startListening();
-    } else {
-      stopAllAudio();
+    if (open) {
+      setStatus("muted");
+      setUserTranscript("");
+      setLastReply("");
+      setAiResponse("Başlamak için mikrofonu aç.");
     }
-    return () => stopAllAudio();
-  }, [open, muted, startListening, stopAllAudio]);
+    return stopAllAudio;
+  }, [open, stopAllAudio]);
 
   if (!open) return null;
 
@@ -167,7 +162,7 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
           </div>
         </div>
 
-        <div className="live-status-text">
+        <div className="live-status-text" role="status">
           {status === "listening" && "Dinliyor…"}
           {status === "thinking" && "NEXUS düşünüyor…"}
           {status === "speaking" && "NEXUS konuşuyor…"}
@@ -176,6 +171,16 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
 
         {userTranscript && <p className="live-user-caption">“{userTranscript}”</p>}
         <p className="live-ai-caption">{aiResponse}</p>
+        {lastReply && "speechSynthesis" in window && <button type="button" onClick={()=>{
+          stopAllAudio();
+          const turn=generation.current;
+          const voice=new SpeechSynthesisUtterance(lastReply);
+          voice.lang=language;
+          voice.rate=rate;
+          voice.onend=voice.onerror=()=>{if(turn===generation.current)setStatus("muted")};
+          setStatus("speaking");
+          window.speechSynthesis.speak(voice);
+        }}>Yanıtı seslendir</button>}
       </div>
 
       <div style={{display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap"}}><button type="button" disabled={status!=="listening"||muted} onClick={()=>{try{recognitionRef.current?.stop()}catch{/* ignore */}}}>Konuşmayı gönder</button><select aria-label="Konuşma dili" value={language} onChange={e=>setLanguage(e.target.value)}><option value="tr-TR">Türkçe</option><option value="en-US">English</option><option value="de-DE">Deutsch</option></select><label>Hız <input type="range" min=".7" max="1.4" step=".1" value={rate} onChange={e=>setRate(Number(e.target.value))}/></label><button type="button" onClick={()=>{stopAllAudio();if(!muted)startListening()}}>Yanıtı kes</button></div>
@@ -184,18 +189,13 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
           type="button"
           className={`live-ctrl-btn ${muted ? "muted" : ""}`}
           onClick={() => {
-            setMuted((m) => {
-              const next = !m;
-              if (next) {
-                stopAllAudio();
-                setStatus("muted");
-              }
-              return next;
-            });
+            if (muted) startListening();
+            else { stopAllAudio(); setStatus("muted"); }
           }}
-          title={muted ? "Sesi aç" : "Sessize al"}
+          title={muted ? "Mikrofonu aç" : "Sessize al"}
         >
-          {muted ? <MicOff size={20} /> : <Mic size={20} />}
+          {muted ? <Mic size={20} /> : <MicOff size={20} />}
+          <span>{muted ? "Mikrofonu aç" : "Sessize al"}</span>
         </button>
 
         <button
