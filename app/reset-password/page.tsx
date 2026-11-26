@@ -74,10 +74,11 @@ export default function ResetPasswordPage() {
           <p>Hesabın için yeni bir şifre oluştur.</p>
         </div>
         <form onSubmit={submit} className="auth-form">
-          <label>YENİ ŞİFRE</label>
+          <label htmlFor="reset-password">YENİ ŞİFRE</label>
           <div className="auth-input">
             <Lock size={17} />
             <input
+              id="reset-password"
               type="password"
               minLength={8}
               autoComplete="new-password"
@@ -87,10 +88,11 @@ export default function ResetPasswordPage() {
               required
             />
           </div>
-          <label>YENİ ŞİFRE TEKRAR</label>
+          <label htmlFor="reset-confirm">YENİ ŞİFRE TEKRAR</label>
           <div className="auth-input">
             <Lock size={17} />
             <input
+              id="reset-confirm"
               type="password"
               minLength={8}
               autoComplete="new-password"
@@ -100,8 +102,8 @@ export default function ResetPasswordPage() {
               required
             />
           </div>
-          {message && <div className="auth-message">{message}</div>}
-          <button type="submit" className="auth-submit" disabled={busy || hasSession === false}>
+          {message && <div className="auth-message" role="status">{message}</div>}
+          <button type="submit" className="auth-submit" disabled={busy || hasSession !== true}>
             {busy ? "GÜNCELLENİYOR…" : "ŞİFREYİ GÜNCELLE"}
             <ArrowRight size={17} />
           </button>

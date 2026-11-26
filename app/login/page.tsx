@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "../../utils/supabase/client";
+import { safeInternalPath } from "../../lib/core/navigation";
 import { Sparkles, Mail, Lock, ArrowRight } from "lucide-react";
 
 function getSiteUrl() {
@@ -18,7 +19,7 @@ function LoginForm() {
   const supabase = createClient();
 
   const rawNext = searchParams.get("next");
-  const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+  const nextPath = safeInternalPath(rawNext);
   const callbackError = searchParams.get("auth") === "callback_error";
 
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -122,10 +123,11 @@ function LoginForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
-          <label>E-POSTA ADRESİ</label>
+          <label htmlFor="auth-email">E-POSTA ADRESİ</label>
           <div className="auth-input">
             <Mail size={17} />
             <input
+              id="auth-email"
               type="email"
               autoComplete="email"
               placeholder="ornek@email.com"
@@ -135,10 +137,11 @@ function LoginForm() {
             />
           </div>
 
-          <label>ŞİFRE</label>
+          <label htmlFor="auth-password">ŞİFRE</label>
           <div className="auth-input">
             <Lock size={17} />
             <input
+              id="auth-password"
               type="password"
               autoComplete={mode === "login" ? "current-password" : "new-password"}
               placeholder={mode === "login" ? "Şifrenizi girin" : "En az 6 karakter"}
@@ -149,7 +152,7 @@ function LoginForm() {
             />
           </div>
 
-          {message && <div className="auth-message">{message}</div>}
+          {message && <div className="auth-message" role="status">{message}</div>}
 
           {mode === "login" && (
             <button type="button" className="auth-forgot" onClick={handleReset} disabled={busy}>
