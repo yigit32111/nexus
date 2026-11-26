@@ -1,6 +1,6 @@
 # NEXUS AI 4.0
 
-NEXUS, Türkçe sohbet, kaynaklı araştırma, belge üretimi ve sesli konuşmayı aynı hesapta bir araya getiren bir yapay zekâ çalışma alanıdır. Canlı sürüm **4.0 Önizleme**, paket sürümü **4.0.0-alpha.1**. [NEXUS’u aç](https://nexus-ifn5.onrender.com) · [Güncel kaynak kodunu ZIP olarak indir](https://github.com/yigit32111/nexus/archive/refs/heads/main.zip)
+NEXUS, Türkçe sohbet, kaynaklı araştırma, belge üretimi ve sesli konuşmayı aynı hesapta bir araya getiren bir yapay zekâ çalışma alanıdır. Bu yayın paketi **4.0.0** sürümünü içerir. Destek kapsamı ve doğrulama koşulları için [4.0.0 yayın notlarına](docs/4.0.0-release.md) bak. [NEXUS’u aç](https://nexus-ifn5.onrender.com) · [Güncel kaynak kodunu ZIP olarak indir](https://github.com/yigit32111/nexus/archive/refs/heads/main.zip)
 
 ## Nereden başlanır?
 

@@ -3,10 +3,10 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NEXUS AI 4.0 Önizleme",
+  title: "NEXUS AI 4.0",
   description: "Your private AI workspace with Gems, Canvas and Real-Time Streaming",
-  applicationName: "NEXUS AI 4.0 Önizleme",
-  appleWebApp: { capable: true, title: "NEXUS 4.0 Önizleme", statusBarStyle: "black-translucent" },
+  applicationName: "NEXUS AI 4.0",
+  appleWebApp: { capable: true, title: "NEXUS 4.0", statusBarStyle: "black-translucent" },
   manifest: "/manifest.webmanifest",
 };
 

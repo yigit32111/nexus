@@ -1,4 +1,4 @@
-name: NEXUS Alpha CI
+name: NEXUS Release CI
 on:
   push:
     branches: ["feature/nexus-3.3-alpha1", "feature/nexus-4.0"]
@@ -34,7 +34,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=moderate
       - name: Install browser engines
         run: npx playwright install --with-deps chromium webkit
-      - name: Live 3.3 smoke test (anonymous only)
+      - name: Live service smoke test (anonymous only)
         run: node tests/smoke.mjs
         env:
           SMOKE_URL: https://nexus-ifn5.onrender.com
