@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, Upload } from "lucide-react";
+import { PanelsTopLeft, Sparkles, Upload } from "lucide-react";
 import { createClient } from "../utils/supabase/client";
 import {
   BUILTIN_GEMS,
@@ -97,7 +97,8 @@ export default function Home() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const recognitionRef = useRef<any>(null);
-  const prevChatIdsRef = useRef<Set<string>>(new Set());
+  const chatWrites = useRef(Promise.resolve());
+  const removedIds = useRef(new Set<string>());
   const dirtyChatIdsRef = useRef<Set<string>>(new Set());
 
   const activeChat = chats.find((c) => c.id === activeId) || null;
@@ -194,7 +195,7 @@ export default function Home() {
           projectId: typeof r.project_id==="string"?r.project_id:undefined,
         }));
         setSyncStatus("Buluttan yüklendi");
-      } else if (localChats.length) {
+      } else if (cloudChatResult.error && localChats.length) {
         loadedChats = localChats;
         setSyncStatus("Yerel yedekten yüklendi");
       } else {
@@ -203,9 +204,9 @@ export default function Home() {
       }
 
       if (cancelled) return;
-      prevChatIdsRef.current = new Set(loadedChats.map((c) => c.id));
+      if (!loadedChats.some(c => !c.archived)) loadedChats.unshift(newChat());
       setChats(loadedChats);
-      setActiveId(loadedChats[0]?.id || "");
+      setActiveId(loadedChats.find(c => !c.archived)!.id);
 
       let savedPrefs: any = {};
       try {
@@ -301,13 +302,6 @@ export default function Home() {
   useEffect(() => {
     if (!userId || loading || chats.length === 0 || busy) return;
     const timer = window.setTimeout(async () => {
-      const currentIds = new Set(chats.map((c) => c.id));
-      const deletedIds = Array.from(prevChatIdsRef.current).filter((id) => !currentIds.has(id));
-      if (deletedIds.length > 0) {
-        await supabase.from("nexus_chats").delete().in("id", deletedIds).eq("user_id", userId);
-      }
-      prevChatIdsRef.current = currentIds;
-
       const dirtyIds = Array.from(dirtyChatIdsRef.current);
       if (!dirtyIds.length) return;
 
@@ -327,9 +321,13 @@ export default function Home() {
       dirtyChatIdsRef.current.clear();
       if (!rows.length) return;
 
-      const { error } = await supabase.from("nexus_chats").upsert(rows, { onConflict: "id" });
+      chatWrites.current = chatWrites.current.then(async () => {
+      const liveRows = rows.filter(row => !removedIds.current.has(row.id));
+      if (!liveRows.length) return;
+      const { error } = await supabase.from("nexus_chats").upsert(liveRows, { onConflict: "id" });
       if(error)for(const row of rows)dirtyChatIdsRef.current.add(row.id);
       setSyncStatus(error ? "Sohbet yerel olarak kaydedildi" : "Tüm değişiklikler eşitlendi");
+      }).catch(() => setSyncStatus("Bulut kaydı başarısız"));
     }, 850);
     return () => window.clearTimeout(timer);
   }, [chats, userId, loading, busy, supabase]);
@@ -856,12 +854,34 @@ export default function Home() {
         }
         onDeleteChat={(id) => {
           if (!window.confirm("Bu sohbet silinsin mi?")) return;
-          const left = chats.filter((c) => c.id !== id);
-          const next = left.length ? left : [newChat()];
-          if (!left.length) markDirty(next[0].id);
-          setChats(next);
-          if (activeId === id) setActiveId(next[0].id);
-          void supabase.from("nexus_chats").delete().eq("id", id).eq("user_id", userId);
+          removedIds.current.add(id);
+          chatWrites.current = chatWrites.current.then(async () => {
+            const { error } = await supabase.from("nexus_chats").delete().eq("id", id).eq("user_id", userId);
+            if (error) {
+              removedIds.current.delete(id);
+              const original = chats.find(c => c.id === id);
+              if (original) setChats(current => current.some(c => c.id === id) ? current : [...current, original]);
+              setNotice("Sohbet buluttan silinemedi. Tekrar deneyebilirsin.");
+            }
+          });
+          const remaining = chats.filter(c => !removedIds.current.has(c.id));
+          const visible = visibleChats.find(c => !removedIds.current.has(c.id));
+          if (activeId === id && !visible) {
+            const fresh = newChat();
+            fresh.projectId = projectFilter || undefined;
+            remaining.unshift(fresh);
+            setActiveId(fresh.id);
+            setArchiveView(false);
+            setSearch("");
+            setFiles([]);
+            setInput("");
+            setEditingMessageId(null);
+          } else if (activeId === id && visible) setActiveId(visible.id);
+          setChats(remaining);
+          chatWrites.current = chatWrites.current.then(async () => {
+            const { error } = await supabase.from("nexus_chats").delete().eq("id", id).eq("user_id", userId);
+            if (error) setNotice("Sohbet buluttan silinemedi. Bağlantını kontrol et.");
+          });
         }}
         gems={allGems}
         activeGemId={activeChat?.gemId}
@@ -931,10 +951,10 @@ export default function Home() {
             }}
           />
 
-          <div style={{display:"flex",gap:8,alignItems:"center",padding:"5px 12px",flexWrap:"wrap",fontSize:11}}>
-            <button type="button" onClick={()=>router.push("/workspace")}>▣ Çalışma alanı</button>
-            <select aria-label="Sohbet proje filtresi" value={projectFilter} onChange={e=>setProjectFilter(e.target.value)}><option value="">Tüm sohbetler</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>
-            {activeChat&&<select aria-label="Aktif sohbetin projesi" disabled={busy} value={activeChat.projectId||""} onChange={e=>{const projectId=e.target.value;updateChat(activeChat.id,c=>({...c,projectId:projectId||undefined,updatedAt:Date.now()}))}}><option value="">Projeye bağla</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>}
+          <div className="project-tools">
+            <button type="button" onClick={()=>router.push("/workspace")}><PanelsTopLeft size={16}/> Çalışma alanı</button>
+            {projects.length > 0 && <select aria-label="Sohbet proje filtresi" value={projectFilter} onChange={e=>setProjectFilter(e.target.value)}><option value="">Tüm sohbetler</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>}
+            {projects.length > 0 && activeChat&&<select aria-label="Aktif sohbetin projesi" disabled={busy} value={activeChat.projectId||""} onChange={e=>{const projectId=e.target.value;updateChat(activeChat.id,c=>({...c,projectId:projectId||undefined,updatedAt:Date.now()}))}}><option value="">Projeye bağla</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>}
           </div>
           <MessageList
             activeChat={activeChat}
@@ -1095,7 +1115,11 @@ export default function Home() {
           }}
           onClearAllChats={async () => {
             if (!window.confirm("Tüm sohbetler silinsin mi?")) return;
-            await supabase.from("nexus_chats").delete().eq("user_id", userId);
+            chats.forEach(c => removedIds.current.add(c.id));
+            await chatWrites.current;
+            const {error} = await supabase.from("nexus_chats").delete().eq("user_id", userId);
+            if(error){ chats.forEach(c=>removedIds.current.delete(c.id)); setNotice("Sohbetler silinemedi."); return; }
+            setArchiveView(false); setProjectFilter(""); setSearch(""); setInput(""); setFiles([]); setEditingMessageId(null);
             const fresh = newChat();
             markDirty(fresh.id);
             setChats([fresh]);

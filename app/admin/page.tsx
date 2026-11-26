@@ -7,10 +7,11 @@ export default async function AdminPage(){
   if(!await getCoreAdmin())notFound();
   const db=createAdminClient();
   const day=new Date().toISOString().slice(0,10);
-  const [limits,rows,logs]=await Promise.all([
+  const [limits,rows,logs,counts]=await Promise.all([
     db.from("nexus_core_limits").select("*").eq("id",true).single(),
     db.from("nexus_core_daily").select("requests,images,reserved_microusd",{count:"exact"}).eq("day",day).limit(10000),
-    db.from("nexus_usage_logs").select("id",{count:"exact",head:true}).gte("created_at",day+"T00:00:00Z")
+    db.from("nexus_usage_logs").select("id",{count:"exact",head:true}).gte("created_at",day+"T00:00:00Z"),
+    db.rpc("nexus_admin_counts")
   ]);
   if(limits.error||rows.error||logs.error||!limits.data)throw new Error("Yönetim verileri alınamadı");
   const cfg=limits.data;
@@ -20,6 +21,15 @@ export default async function AdminPage(){
   return <main style={{maxWidth:850,margin:"auto",padding:24,color:"#e2e8f0",background:"#10151e",minHeight:"100vh",overflowY:"auto"}}>
     <Link href="/" style={{color:"#93c5fd"}}>← NEXUS</Link><h1>NEXUS Admin Center 2.0</h1>
     <p>UTC gün: {day} · Salt okunur yönetim · Rezervasyonlar tahmindir.</p>
+    <h2>Kullanıcılar ve kullanım</h2>
+    {counts.error || !counts.data ? <p>Göstergeler alınamadı.</p> : <dl className="admin-metrics">
+      {Object.entries({
+        "Çevrimiçi · son 2 dakika": counts.data.online,
+        "Free hesap": counts.data.free,
+        "Pro hesap": counts.data.pro,
+        "Toplam token · tüm zamanlar": counts.data.tokens
+      }).map(([label,value])=><div key={label}><dt>{label}</dt><dd>{BigInt(String(value)).toLocaleString("tr-TR")}</dd></div>)}
+    </dl>}
     <h2>Günlük kota durumu</h2>
     <p>Bugünkü istek: {sum("requests")} / {cfg.global_requests}</p>
     <p>Görsel denemesi: {sum("images")} / {cfg.global_images}</p>

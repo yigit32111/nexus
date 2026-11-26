@@ -56,6 +56,24 @@ try {
   await page.getByRole("button", { name: "Çalıştır", exact: true }).click();
   assert.equal(await page.locator("pre[aria-live]").textContent(), "42");
   console.log("OK workspace browser: comparison, synthesis, artifact transfer, agent approval, Code Lab");
+
+  const home = await readFile(".next/server/app/index.html", "utf8");
+  await page.route(base + "/", route => route.fulfill({contentType:"text/html",body:home}));
+  const chats = ["visible", "archived"].map((id, index) => ({
+    id, title:id, archived: Boolean(index), updated_at:new Date().toISOString(),
+    messages:[{id,role:"user",content:"fixture-" + id,createdAt:1}],
+  }));
+  await page.route("**/rest/v1/nexus_chats*", route => route.fulfill({
+    json: route.request().method() === "GET" ? chats : [],
+  }));
+  await page.goto(base + "/");
+  await page.getByText("fixture-visible", {exact:true}).waitFor();
+  page.once("dialog", dialog => dialog.accept());
+  await page.getByTitle("Sil", {exact:true}).click();
+  await page.getByText("fixture-visible", {exact:true}).waitFor({state:"detached"});
+  assert.equal(await page.getByText("fixture-archived",{exact:true}).count(),0);
+  await page.locator(".chat-select").filter({hasText:"Yeni sohbet"}).waitFor();
+  console.log("OK deleting the last visible chat opens a fresh conversation");
 } finally {
   await browser.close();
 }

@@ -1624,3 +1624,13 @@ button, input, textarea, select { font-family: inherit !important; }
 /* RC2 authentication on small screens and mobile Safari */
 .auth-shell{height:100dvh;overflow-y:auto;overflow-x:hidden;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));align-items:safe center}.auth-card{min-width:0;box-sizing:border-box}.auth-input input{min-width:0;font-size:16px}.auth-switch button,.auth-forgot{min-height:40px}.auth-heading p,.auth-message{overflow-wrap:anywhere}
 @media(max-width:375px){.auth-card{padding:20px 15px}.auth-brand{margin-bottom:18px}.auth-footer{margin-top:14px}}
+
+.project-tools {display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px clamp(12px,2vw,28px);border-bottom:1px solid var(--line-soft)}
+.project-tools button,.project-tools select {min-height:36px;max-width:100%;padding:6px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--text);font-size:13px}
+.project-tools button {display:inline-flex;align-items:center;gap:8px;font-weight:650}
+.project-tools button:hover,.project-tools select:hover {background:var(--panel-3)}
+@media(max-width:540px){.project-tools button,.project-tools select {min-height:44px}}
+.admin-metrics {display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px}
+.admin-metrics div {padding:14px;border:1px solid #384354;border-radius:12px}
+.admin-metrics dt {font-size:13px;color:#b9c4d4}
+.admin-metrics dd {margin:6px 0 0;font-size:24px;font-variant-numeric:tabular-nums}
