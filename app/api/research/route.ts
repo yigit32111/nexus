@@ -1,3 +1,4 @@
+import {readJsonLimited} from "../../../lib/core/request-guard";
 import {NextRequest,NextResponse} from "next/server";
 import {createClient} from "../../../utils/supabase/server";
 import {reserveRequest} from "../../../lib/core/budget";
@@ -5,7 +6,9 @@ export const runtime="nodejs";export const dynamic="force-dynamic";
 export async function POST(req:NextRequest){
  try{
   const db=await createClient();const {data:{user},error}=await db.auth.getUser();if(error||!user)return NextResponse.json({error:"Giriş gerekli"},{status:401});
-  const body=await req.json().catch(()=>null);const q=typeof body?.query==="string"?body.query.trim():"";
+  const parsedBody=await readJsonLimited(req,4096);
+    if(!parsedBody.ok)return NextResponse.json({error:parsedBody.error},{status:parsedBody.status});
+    const body=parsedBody.value;const q=typeof body?.query==="string"?body.query.trim():"";
   if(q.length<3||q.length>200)return NextResponse.json({error:"3–200 karakterlik araştırma konusu gir."},{status:400});
   if(!await reserveRequest(user.id,"chat",0))return NextResponse.json({error:"Günlük kota doldu"},{status:429});
   const wikiTasks=["tr","en"].map(async lang=>{

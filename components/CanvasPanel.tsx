@@ -88,7 +88,7 @@ export function CanvasPanel({
     );
   }, [doc.language, doc.content]);
 
-  const [tab, setTab] = useState<"edit" | "preview">(isPreviewable ? "preview" : "edit");
+  const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
 

@@ -1616,3 +1616,7 @@ button, input, textarea, select { font-family: inherit !important; }
   border-bottom: 1px solid var(--line);
   background: #ffffff;
 }
+/* RC1 mobile */
+.share-page-shell{height:100dvh;overflow:auto}.live-voice-overlay{overflow:auto;padding-top:max(24px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom));gap:14px}.live-voice-center{min-width:0;max-height:55dvh;overflow:auto;overflow-wrap:anywhere}.settings-nav{flex-shrink:0}.rich-text,.message-content{min-width:0;overflow-wrap:anywhere}.rich-table-wrap,.code-block{max-width:100%;overflow-x:auto}
+@media(pointer:coarse){.message-row .message-toolbar{opacity:1;visibility:visible;pointer-events:auto;height:auto;min-height:36px;flex-wrap:wrap}.message-toolbar button,.settings-nav button{min-height:40px}.composer-zone{padding-bottom:env(safe-area-inset-bottom)}.composer-box textarea,.settings-dialog input,.settings-dialog textarea,.settings-dialog select,.nx-workspace input,.nx-workspace textarea,.nx-workspace select{font-size:16px!important}.topbar{padding-top:env(safe-area-inset-top);min-height:calc(52px + env(safe-area-inset-top))}.sidebar{padding-bottom:max(12px,env(safe-area-inset-bottom))}.share-topbar{height:auto;min-height:58px;padding:10px 12px;gap:8px;flex-wrap:wrap}.share-brand span{display:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}

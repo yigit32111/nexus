@@ -1,3 +1,4 @@
+import {readJsonLimited} from "../../../lib/core/request-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { writeUsageLog } from "../../../utils/supabase/admin";
@@ -22,7 +23,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Görsel üretmek için giriş yap." }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => null);
+    const parsedBody=await readJsonLimited(req,8192);
+    if(!parsedBody.ok)return NextResponse.json({error:parsedBody.error},{status:parsedBody.status});
+    const body=parsedBody.value;
     const prompt = typeof body?.prompt === "string" ? body.prompt.trim().slice(0, 1200) : "";
     if (!prompt) {
       return NextResponse.json({ error: "Görsel açıklaması (prompt) gerekli." }, { status: 400 });

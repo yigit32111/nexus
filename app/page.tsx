@@ -598,7 +598,7 @@ export default function Home() {
         signal: controller.signal,
         body: JSON.stringify({
           stream: true,
-          messages: outgoing.map((m) => ({ role: m.role, content: m.content })),
+          messages: outgoing.slice(-50).map((m) => ({ role: m.role, content: m.content })),
           memory: approvedMemory.map((m) => `• [${m.category}] ${m.text}`).join("\n"),
           projectId: activeChat.projectId,
           chatId: activeChat.id,

@@ -1,9 +1,11 @@
 import "server-only";
 import {chooseModel,estimateReservation,parsePrice,type CatalogModel} from "./model-policy";
 let catalog:{expires:number; models:CatalogModel[]}|undefined;
+let loading:Promise<void>|undefined;
 export async function routeModel(args:{base:string;key:string;requested:string;defaultId:string;query:string;images:number;inputTokens:number;web:boolean}){
   if(new URL(args.base).origin!=="https://openrouter.ai")throw new Error("CORE_PROVIDER");
   if(!catalog||catalog.expires<Date.now()){
+    if(!loading)loading=(async()=>{
     const r=await fetch("https://openrouter.ai/api/v1/models",{headers:{Authorization:`Bearer ${args.key}`},cache:"no-store",signal:AbortSignal.timeout(12000)});
     if(!r.ok)throw new Error("CORE_CATALOG");
     const payload=await r.json();
@@ -17,7 +19,10 @@ export async function routeModel(args:{base:string;key:string;requested:string;d
       models.push({id:m.id,context,vision:m.architecture.input_modalities.includes("image"),prompt,completion,request,image,supported:Array.isArray(m.supported_parameters)?m.supported_parameters:[]});
     }
     catalog={models,expires:Date.now()+120000};
+    })().finally(()=>{loading=undefined});
+    await loading;
   }
+  if(!catalog)throw new Error("CORE_CATALOG");
   const model=chooseModel(catalog.models,args.requested,args.defaultId,args.query,args.images,args.inputTokens);
   if(!model)throw new Error("CORE_MODEL");
   return {model,reserve:estimateReservation(model,args.inputTokens,args.images,args.web),maxPrice:{prompt:model.prompt*1e6,completion:model.completion*1e6,request:model.request,image:model.image}};

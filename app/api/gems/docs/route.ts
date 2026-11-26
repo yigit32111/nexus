@@ -1,3 +1,4 @@
+import {readJsonLimited} from "../../../../lib/core/request-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../../utils/supabase/server";
 import { chunkText, uid } from "../../../../lib/nexus-utils";
@@ -16,7 +17,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Yetkisiz erişim." }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => null);
+    const parsedBody=await readJsonLimited(req,12582912);
+    if(!parsedBody.ok)return NextResponse.json({error:parsedBody.error},{status:parsedBody.status});
+    const body=parsedBody.value;
     if (!body || typeof body.gemId !== "string" || typeof body.fileName !== "string") {
       return NextResponse.json({ error: "Geçersiz dosya isteği." }, { status: 400 });
     }
@@ -27,7 +30,7 @@ export async function POST(req: NextRequest) {
     const dataUrl = String(body.dataUrl || "");
 
     const match = dataUrl.match(/^data:([^;]+);base64,([A-Za-z0-9+/]+={0,2})$/);
-    if (!match) {
+    if (!match || match[1]!==fileType || !["application/pdf","text/plain"].includes(fileType)) {
       return NextResponse.json({ error: "Dosya içeriği okunamadı." }, { status: 400 });
     }
 
@@ -37,16 +40,17 @@ export async function POST(req: NextRequest) {
     }
 
     let fullText = "";
-    if (fileType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf")) {
+    if (fileType === "application/pdf") {
+      if(buffer.subarray(0,5).toString()!=="%PDF-")return NextResponse.json({error:"Geçersiz PDF."},{status:400});
       const pdfModule = await import("pdf-parse");
       const parse = (pdfModule as any).default ?? pdfModule;
-      const parsed = await parse(buffer);
+      const parsed = await parse(buffer,{max:50});
       fullText = String(parsed?.text || "");
     } else {
       fullText = buffer.toString("utf8");
     }
 
-    const chunks = chunkText(fullText, 1000, 180);
+    const chunks = chunkText(fullText.slice(0,200000), 1000, 180);
     if (!chunks.length) {
       return NextResponse.json({ error: "Dosyadan okunabilir metin çıkarılamadı." }, { status: 422 });
     }
