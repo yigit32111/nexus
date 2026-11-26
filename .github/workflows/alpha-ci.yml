@@ -9,7 +9,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,3 +32,19 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-placeholder
       - name: Runtime dependency audit
         run: npm audit --omit=dev --audit-level=moderate
+      - name: Install browser engines
+        run: npx playwright install --with-deps chromium webkit
+      - name: Live RC1 smoke test (anonymous only)
+        run: node tests/smoke.mjs
+        env:
+          SMOKE_URL: https://nexus-ifn5.onrender.com
+      - name: Desktop and mobile login browser smoke
+        run: |
+          npm run start > /tmp/nexus-browser.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true; cat /tmp/nexus-browser.log' EXIT
+          for i in {1..30}; do curl -fsS http://127.0.0.1:3000/login >/dev/null && break; sleep 1; done
+          node tests/browser-smoke.mjs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-placeholder
