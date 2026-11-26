@@ -67,8 +67,8 @@ function LoginForm() {
         router.replace(nextPath);
         router.refresh();
       } else {
-        if (password.length < 8) {
-          throw new Error("Şifre en az 8 karakter olmalı.");
+        if (password.length < 6) {
+          throw new Error("Şifre en az 6 karakter olmalı.");
         }
 
         const siteUrl = getSiteUrl();
@@ -141,10 +141,10 @@ function LoginForm() {
             <input
               type="password"
               autoComplete={mode === "login" ? "current-password" : "new-password"}
-              placeholder="En az 8 karakter"
+              placeholder={mode === "login" ? "Şifrenizi girin" : "En az 6 karakter"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              minLength={8}
+              minLength={6}
               required
             />
           </div>
