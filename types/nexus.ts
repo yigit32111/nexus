@@ -102,6 +102,7 @@ export type Prefs = {
   memoryItems: MemoryItem[];
   memoryMode: "hybrid" | "manual" | "off";
   autoMemoryExtract: boolean;
+  historyRecall: boolean;
   style: "balanced" | "concise" | "detailed";
   tone: "natural" | "friendly" | "professional";
   temperature: number;
@@ -167,6 +168,7 @@ export const DEFAULT_PREFS: Prefs = {
   memoryItems: [],
   memoryMode: "hybrid",
   autoMemoryExtract: true,
+  historyRecall: false,
   style: "balanced",
   tone: "natural",
   temperature: 0.7,
@@ -184,6 +186,6 @@ export const INTRO_MESSAGE: Message = {
   id: "intro",
   role: "assistant",
   content:
-    "Merhaba, ben NEXUS 3.2. Soru sorabilir, Gem bilgi bankana doküman yükleyebilir, Canvas 2.0 ile canlı React uygulamaları çalıştırabilir, görsel üretebilir veya NEXUS Live ile sesli sohbet edebilirsin.",
+    "Merhaba, ben NEXUS 3.3. Soru sorabilir, Gem bilgi bankana doküman yükleyebilir, Canvas 2.0 ile canlı React uygulamaları çalıştırabilir, görsel üretebilir veya NEXUS Live ile sesli sohbet edebilirsin.",
   createdAt: Date.now(),
 };

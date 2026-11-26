@@ -555,7 +555,7 @@ export default function Home() {
 
     const userText = rawContent || "Eklediğim dosyaları incele ve açıkla.";
 
-    if (!opts?.regenerateFrom && prefs.memoryMode === "hybrid") {
+    if (!opts?.regenerateFrom && prefs.memoryMode === "hybrid" && !activeChat.projectId) {
       const candidates = detectMemoryCandidates(userText, prefs.autoMemoryExtract);
       for (const c of candidates) {
         addMemory(c.text, c.category, false);
@@ -600,6 +600,7 @@ export default function Home() {
           messages: outgoing.map((m) => ({ role: m.role, content: m.content })),
           memory: approvedMemory.map((m) => `• [${m.category}] ${m.text}`).join("\n"),
           projectId: activeChat.projectId,
+          chatId: activeChat.id,
           model: effectiveModelId || undefined,
           modelSupportsVision:
             selectedModel?.vision === true || VISION_ID_RE.test(effectiveModelId),
@@ -609,6 +610,7 @@ export default function Home() {
             tone: prefs.tone,
             temperature: prefs.temperature,
             memoryMode: prefs.memoryMode,
+            historyRecall: prefs.historyRecall === true,
             systemPrompt: prefs.systemPrompt,
             gemId: activeGem?.id || "",
             gemInstruction: activeGem?.instruction || "",
