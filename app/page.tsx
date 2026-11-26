@@ -800,7 +800,7 @@ export default function Home() {
             <Sparkles size={24} />
           </div>
           <strong>
-            NEXUS<span>4.0 Önizleme</span>
+            NEXUS<span>4.0</span>
           </strong>
           <small>ÇALIŞMA ALANI HAZIRLANIYOR</small>
           <i />
