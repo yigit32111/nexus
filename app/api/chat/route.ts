@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
+import { writeUsageLog } from "../../../utils/supabase/admin";
 import { estimateTokens } from "../../../lib/nexus-utils";
 
 export const runtime = "nodejs";
@@ -437,9 +438,7 @@ export async function POST(req: NextRequest) {
               )
             );
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-            controller.close();
-
-            void supabase.from("nexus_usage_logs").insert({
+            await writeUsageLog({
               user_id: user.id,
               model: effectiveModel,
               provider: isGroq ? "GROQ" : isOpenRouter ? "OPENROUTER" : "CUSTOM",
@@ -447,6 +446,7 @@ export async function POST(req: NextRequest) {
               prompt_tokens: promptTokensEst,
               completion_tokens: completionTokensEst,
             });
+            controller.close();
           }
         },
       });
@@ -463,6 +463,14 @@ export async function POST(req: NextRequest) {
     const payload = await response.json().catch(() => ({}));
     const choice = payload?.choices?.[0];
     const reply = String(choice?.message?.content || "").trim();
+    await writeUsageLog({
+      user_id: user.id,
+      model: effectiveModel,
+      provider: isGroq ? "GROQ" : isOpenRouter ? "OPENROUTER" : "CUSTOM",
+      feature: isLiveVoice ? "live" : ragSources.length ? "rag" : "chat",
+      prompt_tokens: Number.isSafeInteger(payload?.usage?.prompt_tokens) && payload.usage.prompt_tokens >= 0 ? payload.usage.prompt_tokens : promptTokensEst,
+      completion_tokens: Number.isSafeInteger(payload?.usage?.completion_tokens) && payload.usage.completion_tokens >= 0 ? payload.usage.completion_tokens : estimateTokens(reply),
+    });
     return NextResponse.json({
       reply,
       reasoning: choice?.message?.reasoning || "",
