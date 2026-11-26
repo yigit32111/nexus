@@ -8,11 +8,18 @@ export type UploadAttachment = AttachmentMeta & {
   dataUrl: string;
 };
 
+export type RagSource = {
+  fileName: string;
+  snippet: string;
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   reasoning?: string;
+  imageUrl?: string;
+  ragSources?: RagSource[];
   createdAt: number;
   attachments?: AttachmentMeta[];
 };
@@ -37,6 +44,13 @@ export type MemoryItem = {
   approved: boolean;
 };
 
+export type GemDocMeta = {
+  id: string;
+  name: string;
+  size: number;
+  chunkCount: number;
+};
+
 export type Gem = {
   id: string;
   name: string;
@@ -45,6 +59,7 @@ export type Gem = {
   icon: "code" | "search" | "pen" | "graduation" | "sparkles";
   model?: string;
   builtIn?: boolean;
+  documents?: GemDocMeta[];
 };
 
 export type ModelInfo = {
@@ -57,15 +72,35 @@ export type ModelInfo = {
   supportedParameters?: string[];
 };
 
+export type CanvasVersion = {
+  id: string;
+  label: string;
+  content: string;
+  createdAt: number;
+};
+
 export type CanvasDoc = {
   title: string;
   language: string;
   content: string;
+  versions?: CanvasVersion[];
+  activeVersionIndex?: number;
+  shareId?: string;
+};
+
+export type UsageStats = {
+  totalMessages: number;
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  totalImages: number;
+  byModel: Record<string, { messages: number; tokens: number }>;
+  daily: Record<string, number>;
 };
 
 export type Prefs = {
   memoryItems: MemoryItem[];
   memoryMode: "hybrid" | "manual" | "off";
+  autoMemoryExtract: boolean;
   style: "balanced" | "concise" | "detailed";
   tone: "natural" | "friendly" | "professional";
   temperature: number;
@@ -76,6 +111,16 @@ export type Prefs = {
   webSearch: boolean;
   codeExecution: boolean;
   gems: Gem[];
+  usageStats: UsageStats;
+};
+
+export const EMPTY_USAGE_STATS: UsageStats = {
+  totalMessages: 0,
+  totalPromptTokens: 0,
+  totalCompletionTokens: 0,
+  totalImages: 0,
+  byModel: {},
+  daily: {},
 };
 
 export const BUILTIN_GEMS: Gem[] = [
@@ -120,6 +165,7 @@ export const BUILTIN_GEMS: Gem[] = [
 export const DEFAULT_PREFS: Prefs = {
   memoryItems: [],
   memoryMode: "hybrid",
+  autoMemoryExtract: true,
   style: "balanced",
   tone: "natural",
   temperature: 0.7,
@@ -130,12 +176,13 @@ export const DEFAULT_PREFS: Prefs = {
   webSearch: false,
   codeExecution: false,
   gems: [],
+  usageStats: EMPTY_USAGE_STATS,
 };
 
 export const INTRO_MESSAGE: Message = {
   id: "intro",
   role: "assistant",
   content:
-    "Merhaba, ben NEXUS 3.1. Ne üzerinde çalışmak istersin? Soru sorabilir, dosya ekleyebilir, bir Gem seçebilir veya Canvas ile canlı kod/metin geliştirebilirsin.",
+    "Merhaba, ben NEXUS 3.2. Soru sorabilir, Gem bilgi bankana doküman yükleyebilir, Canvas 2.0 ile canlı React uygulamaları çalıştırabilir, görsel üretebilir veya NEXUS Live ile sesli sohbet edebilirsin.",
   createdAt: Date.now(),
 };

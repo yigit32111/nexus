@@ -1,0 +1,59 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "../../../utils/supabase/server";
+import { uid } from "../../../lib/nexus-utils";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function POST(req: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Paylaşım oluşturmak için giriş yap." }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Geçersiz paylaşım verisi." }, { status: 400 });
+    }
+
+    const shareId = uid().replace(/-/g, "").slice(0, 14);
+    const shareType = body.shareType === "chat" ? "chat" : "canvas";
+    const title = String(body.title || "NEXUS Paylaşımı").slice(0, 120);
+    const language = String(body.language || "markdown").slice(0, 40);
+    const content = String(body.content || "").slice(0, 100000);
+    const messages = Array.isArray(body.messages) ? body.messages.slice(0, 100) : [];
+
+    const { error } = await supabase.from("nexus_shares").insert({
+      id: shareId,
+      user_id: user.id,
+      title,
+      share_type: shareType,
+      language,
+      content,
+      messages,
+    });
+
+    if (error) {
+      console.error("NEXUS SHARE ERROR", error);
+      return NextResponse.json(
+        { error: "Paylaşım kaydedilemedi. nexus_shares tablosunun oluşturulduğundan emin ol." },
+        { status: 500 }
+      );
+    }
+
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "") || new URL(req.url).origin;
+
+    return NextResponse.json({
+      shareId,
+      url: `${baseUrl}/share/${shareId}`,
+    });
+  } catch {
+    return NextResponse.json({ error: "Paylaşım oluşturulurken hata oluştu." }, { status: 500 });
+  }
+}

@@ -5,6 +5,7 @@ import {
   BookOpen,
   Code2,
   Copy,
+  Download,
   FileText,
   Image as ImageIcon,
   PanelRightOpen,
@@ -66,7 +67,12 @@ export function MessageList({
             <div className="active-gem-banner">
               <div className="active-gem-icon">{renderGemIcon(activeGem.icon, 22)}</div>
               <div>
-                <span className="gem-tag">AKTİF GEM ASİSTANI</span>
+                <span className="gem-tag">
+                  AKTİF GEM ASİSTANI
+                  {activeGem.documents?.length
+                    ? ` · ${activeGem.documents.length} REFERANS DOSYA`
+                    : ""}
+                </span>
                 <h2>{activeGem.name}</h2>
                 <p>{activeGem.description}</p>
               </div>
@@ -77,8 +83,8 @@ export function MessageList({
                 Merhaba, <em>nasıl yardımcı olayım?</em>
               </h1>
               <p>
-                Sorularını sor, dosya ekle, bir Gem seç veya Canvas ile canlı kod ve metin
-                geliştir.
+                Sorularını sor, Gem bilgi bankana doküman yükle, görsel üret veya Canvas 2.0 ile
+                canlı React bileşenleri çalıştır.
               </p>
             </>
           )}
@@ -100,33 +106,33 @@ export function MessageList({
               type="button"
               onClick={() =>
                 onSelectStarterPrompt(
-                  "Bu fikri birlikte geliştirelim. Bana önce doğru soruları sor."
+                  "Bana interaktif bir Pomodoro zamanlayıcı React bileşeni yaz."
                 )
               }
             >
-              <Sparkles size={17} />
+              <Code2 size={17} />
               <span>
-                <b>Fikir geliştir</b>
-                <small>Bir düşünceyi projeye dönüştür</small>
+                <b>Canlı React uygulaması</b>
+                <small>Canvas 2.0 ile anında çalıştır</small>
               </span>
             </button>
             <button
               type="button"
               onClick={() =>
-                onSelectStarterPrompt("Bu kodu incele, hataları bul ve daha iyi hâle getir.")
+                onSelectStarterPrompt("/ciz Geleceğin fütüristik İstanbul boğazı, sinematik ışık")
               }
             >
-              <Code2 size={17} />
+              <Sparkles size={17} />
               <span>
-                <b>Kod desteği</b>
-                <small>Hata ayıkla ve Canvas'ta önizle</small>
+                <b>Görsel üret</b>
+                <small>Metinden yüksek çözünürlüklü görsel çiz</small>
               </span>
             </button>
             <button type="button" onClick={onTriggerFileUpload}>
               <FileText size={17} />
               <span>
                 <b>Dosya incele</b>
-                <small>PDF, metin veya görsel ekle</small>
+                <small>PDF, metin veya görsel analiz et</small>
               </span>
             </button>
           </div>
@@ -190,7 +196,7 @@ export function MessageList({
                         </div>
                       ) : null}
                     </div>
-<div className="message-toolbar user-message-toolbar">
+                    <div className="message-toolbar user-message-toolbar">
                       <button
                         type="button"
                         onClick={() => onCopyText(message.content)}
@@ -207,7 +213,8 @@ export function MessageList({
                       >
                         <Pencil size={14} />
                       </button>
-                    </div></>
+                    </div>
+                  </>
                 ) : (
                   <>
                     <div className="message-heading">
@@ -220,6 +227,18 @@ export function MessageList({
                       </time>
                     </div>
 
+                    {/* RAG Citations from Gem Knowledge Base */}
+                    {message.ragSources && message.ragSources.length > 0 && (
+                      <div className="rag-sources-bar">
+                        <span>Kaynaklar:</span>
+                        {message.ragSources.map((src, si) => (
+                          <span key={si} className="rag-source-pill" title={src.snippet}>
+                            <FileText size={11} /> {src.fileName}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     {thinking && (
                       <ThinkingAccordion
                         thinking={thinking}
@@ -227,12 +246,34 @@ export function MessageList({
                       />
                     )}
 
-                    <div className="message-content">
-                      <RichText text={cleanContent} onOpenCanvas={onOpenCanvas} />
-                      {isStreaming && !isThinkingOpen && <span className="typing-caret" />}
-                    </div>
+                    {/* Generated Image Card */}
+                    {message.imageUrl && (
+                      <div className="generated-image-card">
+                        <img src={message.imageUrl} alt={cleanContent} loading="lazy" />
+                        <div className="generated-image-footer">
+                          <span>{cleanContent}</span>
+                          <a
+                            href={message.imageUrl}
+                            download="nexus-gorsel.png"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="icon-button"
+                            title="Görseli indir / aç"
+                          >
+                            <Download size={15} />
+                          </a>
+                        </div>
+                      </div>
+                    )}
 
-                    {!isStreaming && cleanContent && (
+                    {!message.imageUrl && (
+                      <div className="message-content">
+                        <RichText text={cleanContent} onOpenCanvas={onOpenCanvas} />
+                        {isStreaming && !isThinkingOpen && <span className="typing-caret" />}
+                      </div>
+                    )}
+
+                    {!isStreaming && (cleanContent || message.imageUrl) && (
                       <>
                         <div className="message-toolbar">
                           <button type="button" onClick={() => onCopyText(cleanContent)}>
@@ -241,18 +282,20 @@ export function MessageList({
                           <button type="button" onClick={() => onSpeakText(cleanContent)}>
                             <Volume2 size={13} /> Sesli oku
                           </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              onOpenCanvas({
-                                title: activeChat?.title || "NEXUS Taslağı",
-                                language: "markdown",
-                                content: cleanContent,
-                              })
-                            }
-                          >
-                            <PanelRightOpen size={13} /> Canvas'ta aç
-                          </button>
+                          {!message.imageUrl && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onOpenCanvas({
+                                  title: activeChat?.title || "NEXUS Taslağı",
+                                  language: "markdown",
+                                  content: cleanContent,
+                                })
+                              }
+                            >
+                              <PanelRightOpen size={13} /> Canvas'ta aç
+                            </button>
+                          )}
                           {isLastAssistant && (
                             <button type="button" onClick={onRegenerate}>
                               <RefreshCw size={13} /> Yeniden üret
@@ -260,8 +303,7 @@ export function MessageList({
                           )}
                         </div>
 
-                        {/* Gemini-inspired Response Modifier Pills */}
-                        {isLastAssistant && !busy && (
+                        {isLastAssistant && !busy && !message.imageUrl && (
                           <div className="refine-pills">
                             <span>Yanıtı ayarla:</span>
                             <button
@@ -309,7 +351,7 @@ export function MessageList({
               <Sparkles size={16} />
             </div>
             <div>
-              <b>NEXUS yanıt hazırlıyor</b>
+              <b>NEXUS hazırlıyor</b>
               <div className="thinking-dots">
                 <i />
                 <i />

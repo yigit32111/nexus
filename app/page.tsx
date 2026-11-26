@@ -9,11 +9,13 @@ import {
   CanvasDoc,
   Chat,
   DEFAULT_PREFS,
+  EMPTY_USAGE_STATS,
   Gem,
   MemoryCategory,
   Message,
   ModelInfo,
   Prefs,
+  RagSource,
   UploadAttachment,
 } from "../types/nexus";
 import {
@@ -21,7 +23,7 @@ import {
   MAX_FILES,
   VISION_ID_RE,
   buildEnhancedPrompt,
-  detectMemoryCandidate,
+  detectMemoryCandidates,
   fileToDataUrl,
   newChat,
   safeMessageList,
@@ -35,11 +37,10 @@ import { Composer } from "../components/Composer";
 import { CanvasPanel } from "../components/CanvasPanel";
 import { GemModal } from "../components/GemModal";
 import { SettingsModal } from "../components/SettingsModal";
+import { LiveVoiceModal } from "../components/LiveVoiceModal";
 
 const CHAT_KEY = "nexus_chats_v3";
 const PREF_KEY = "nexus_prefs_v3";
-const LEGACY_CHAT_KEY = "nexus_chats_v2";
-const LEGACY_PREF_KEY = "nexus_prefs_v2";
 
 export default function Home() {
   const router = useRouter();
@@ -63,7 +64,7 @@ export default function Home() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<
-    "general" | "gems" | "memory" | "account" | "system"
+    "general" | "gems" | "memory" | "analytics" | "account" | "system"
   >("general");
 
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
@@ -79,8 +80,9 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [imageMode, setImageMode] = useState(false);
+  const [liveVoiceOpen, setLiveVoiceOpen] = useState(false);
 
-  // NEXUS 3.1 Canvas & Gems state
   const [canvasDoc, setCanvasDoc] = useState<CanvasDoc | null>(null);
   const [gemModalState, setGemModalState] = useState<{ open: boolean; gem?: Gem }>({
     open: false,
@@ -133,7 +135,6 @@ export default function Home() {
     el.style.height = `${Math.min(el.scrollHeight, 190)}px`;
   }, [input]);
 
-  // Initial load from Supabase + LocalStorage
   useEffect(() => {
     let cancelled = false;
     async function init() {
@@ -158,9 +159,7 @@ export default function Home() {
 
       let localChats: Chat[] = [];
       try {
-        const saved =
-          localStorage.getItem(`${CHAT_KEY}_${id}`) ||
-          localStorage.getItem(`${LEGACY_CHAT_KEY}_${id}`);
+        const saved = localStorage.getItem(`${CHAT_KEY}_${id}`);
         const json = saved ? JSON.parse(saved) : [];
         if (Array.isArray(json)) {
           localChats = json.map((c: any) => ({
@@ -192,29 +191,20 @@ export default function Home() {
         setSyncStatus("Buluttan yüklendi");
       } else if (localChats.length) {
         loadedChats = localChats;
-        setSyncStatus(cloudChatResult.error ? "Yerel yedekten yüklendi" : "Yeni bulut alanı");
+        setSyncStatus("Yerel yedekten yüklendi");
       } else {
         loadedChats = [newChat()];
-        setSyncStatus(cloudChatResult.error ? "Çevrimdışı çalışma" : "Hazır");
+        setSyncStatus("Hazır");
       }
 
       if (cancelled) return;
       prevChatIdsRef.current = new Set(loadedChats.map((c) => c.id));
       setChats(loadedChats);
       setActiveId(loadedChats[0]?.id || "");
-      try {
-        localStorage.setItem(`${CHAT_KEY}_${id}`, JSON.stringify(loadedChats));
-      } catch {
-        /* ignore */
-      }
 
       let savedPrefs: any = {};
       try {
-        savedPrefs = JSON.parse(
-          localStorage.getItem(`${PREF_KEY}_${id}`) ||
-            localStorage.getItem(`${LEGACY_PREF_KEY}_${id}`) ||
-            "{}"
-        );
+        savedPrefs = JSON.parse(localStorage.getItem(`${PREF_KEY}_${id}`) || "{}");
       } catch {
         savedPrefs = {};
       }
@@ -234,15 +224,9 @@ export default function Home() {
       const hydrated: Prefs = {
         ...DEFAULT_PREFS,
         ...source,
-        memoryItems: Array.isArray(source.memoryItems)
-          ? source.memoryItems.filter((m: any) => m && typeof m.text === "string").slice(0, 100)
-          : [],
-        gems: Array.isArray(source.gems)
-          ? source.gems.filter((g: any) => g && typeof g.name === "string").slice(0, 30)
-          : [],
-        memoryMode: ["hybrid", "manual", "off"].includes(source.memoryMode)
-          ? source.memoryMode
-          : "hybrid",
+        memoryItems: Array.isArray(source.memoryItems) ? source.memoryItems.slice(0, 100) : [],
+        gems: Array.isArray(source.gems) ? source.gems.slice(0, 30) : [],
+        usageStats: source.usageStats ? { ...EMPTY_USAGE_STATS, ...source.usageStats } : EMPTY_USAGE_STATS,
         theme: source.theme === "light" ? "light" : "dark",
       };
       setPrefs(hydrated);
@@ -271,27 +255,21 @@ export default function Home() {
       setLoading(false);
     }
 
-    init().catch((error) => {
-      console.error("NEXUS INIT ERROR", error);
-      setNotice("Uygulama başlatılırken bir hata oluştu.");
-      setLoading(false);
-    });
+    init().catch(() => setLoading(false));
     return () => {
       cancelled = true;
     };
   }, [router, supabase]);
 
-  // Persist chats to localStorage
   useEffect(() => {
     if (!userId || loading) return;
     try {
       localStorage.setItem(`${CHAT_KEY}_${userId}`, JSON.stringify(chats));
     } catch {
-      setSyncStatus("Yerel kayıt alanı dolu olabilir");
+      /* ignore */
     }
   }, [chats, userId, loading]);
 
-  // Persist prefs to Supabase
   useEffect(() => {
     if (!userId || loading || !prefsLoaded) return;
     try {
@@ -306,17 +284,11 @@ export default function Home() {
           { user_id: userId, prefs, updated_at: new Date().toISOString() },
           { onConflict: "user_id" }
         );
-      if (error) {
-        console.error("NEXUS PREFS SAVE", error);
-        setSyncStatus("Hafıza yerel olarak kaydedildi");
-      } else {
-        setSyncStatus("Hafıza ve ayarlar kaydedildi");
-      }
+      setSyncStatus(error ? "Hafıza yerel olarak kaydedildi" : "Hafıza ve ayarlar kaydedildi");
     }, 650);
     return () => window.clearTimeout(timer);
   }, [prefs, prefsLoaded, userId, loading, supabase]);
 
-  // Incremental Supabase chat sync (only dirty chats + deletions)
   useEffect(() => {
     if (!userId || loading || chats.length === 0 || busy) return;
     const timer = window.setTimeout(async () => {
@@ -328,7 +300,7 @@ export default function Home() {
       prevChatIdsRef.current = currentIds;
 
       const dirtyIds = Array.from(dirtyChatIdsRef.current);
-      if (dirtyIds.length === 0) return;
+      if (!dirtyIds.length) return;
 
       const rows = chats
         .filter((c) => dirtyIds.includes(c.id))
@@ -346,12 +318,7 @@ export default function Home() {
       if (!rows.length) return;
 
       const { error } = await supabase.from("nexus_chats").upsert(rows, { onConflict: "id" });
-      if (error) {
-        console.error("NEXUS CHAT SYNC", error);
-        setSyncStatus("Sohbet yerel olarak kaydedildi");
-      } else {
-        setSyncStatus("Tüm değişiklikler eşitlendi");
-      }
+      setSyncStatus(error ? "Sohbet yerel olarak kaydedildi" : "Tüm değişiklikler eşitlendi");
     }, 850);
     return () => window.clearTimeout(timer);
   }, [chats, userId, loading, busy, supabase]);
@@ -382,42 +349,6 @@ export default function Home() {
     [markDirty]
   );
 
-  const submitComposerRef = useRef<() => void>(() => {});
-
-  // Fixed keyboard shortcuts (including .sidebar-search input)
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const target = e.target as HTMLElement | null;
-      const typingInField = target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        createChat();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === "/") {
-        e.preventDefault();
-        setSidebarOpen(true);
-        window.setTimeout(
-          () => document.querySelector<HTMLInputElement>(".sidebar-search input")?.focus(),
-          50
-        );
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        e.preventDefault();
-        submitComposerRef.current();
-      }
-      if (e.key === "Escape") {
-        setShowSettings(false);
-        setMobileMenu(false);
-        setGemModalState({ open: false });
-      }
-      if (!typingInField && e.key === "n" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        createChat();
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [createChat]);
-
   function updateChat(id: string, updater: (chat: Chat) => Chat) {
     markDirty(id);
     setChats((prev) => prev.map((c) => (c.id === id ? updater(c) : c)));
@@ -427,42 +358,14 @@ export default function Home() {
     updateChat(id, (c) => ({ ...c, messages, updatedAt: Date.now() }));
   }
 
-  function toggleChat(id: string, key: "pinned" | "archived") {
-    updateChat(id, (c) => ({ ...c, [key]: !c[key], updatedAt: Date.now() }));
-    if (key === "archived" && activeId === id && !chats.find((c) => c.id === id)?.archived) {
-      const next = chats.find((c) => c.id !== id && !c.archived);
-      if (next) setActiveId(next.id);
-      else createChat();
-    }
-  }
-
-  function renameChat(chat: Chat) {
-    const name = window.prompt("Sohbet adını yaz:", chat.title);
-    if (name?.trim()) {
-      updateChat(chat.id, (c) => ({
-        ...c,
-        title: name.trim().slice(0, 100),
-        updatedAt: Date.now(),
-      }));
-    }
-  }
-
-  function deleteChat(id: string) {
-    if (!window.confirm("Bu sohbeti kalıcı olarak silmek istiyor musun?")) return;
-    const left = chats.filter((c) => c.id !== id);
-    const next = left.length ? left : [newChat()];
-    if (!left.length) markDirty(next[0].id);
-    setChats(next);
-    if (activeId === id) setActiveId(next[0].id);
-    void supabase.from("nexus_chats").delete().eq("id", id).eq("user_id", userId);
-  }
-
   function addMemory(text: string, category: MemoryCategory, approved = true) {
     const clean = text.trim().replace(/\s+/g, " ").slice(0, 240);
     if (!clean) return;
     setPrefs((p) => {
       if (
-        p.memoryItems.some((m) => m.text.toLocaleLowerCase("tr-TR") === clean.toLocaleLowerCase("tr-TR"))
+        p.memoryItems.some(
+          (m) => m.text.toLocaleLowerCase("tr-TR") === clean.toLocaleLowerCase("tr-TR")
+        )
       ) {
         return p;
       }
@@ -472,6 +375,34 @@ export default function Home() {
           { id: uid(), text: clean, category, createdAt: Date.now(), approved },
           ...p.memoryItems,
         ].slice(0, 100),
+      };
+    });
+  }
+
+  function recordUsage(model: string, promptTokens: number, completionTokens: number, isImage = false) {
+    const today = new Date().toISOString().slice(0, 10);
+    setPrefs((p) => {
+      const prev = p.usageStats || EMPTY_USAGE_STATS;
+      const modelPrev = prev.byModel?.[model] || { messages: 0, tokens: 0 };
+      return {
+        ...p,
+        usageStats: {
+          totalMessages: prev.totalMessages + 1,
+          totalPromptTokens: prev.totalPromptTokens + promptTokens,
+          totalCompletionTokens: prev.totalCompletionTokens + completionTokens,
+          totalImages: prev.totalImages + (isImage ? 1 : 0),
+          byModel: {
+            ...prev.byModel,
+            [model]: {
+              messages: modelPrev.messages + 1,
+              tokens: modelPrev.tokens + promptTokens + completionTokens,
+            },
+          },
+          daily: {
+            ...prev.daily,
+            [today]: (prev.daily?.[today] || 0) + 1,
+          },
+        },
       };
     });
   }
@@ -522,11 +453,71 @@ export default function Home() {
     setStreamingMessageId(null);
   }
 
-  async function send(text?: string, opts?: { regenerateFrom?: Message[]; editIndex?: number }) {
-    const content = (text ?? input).trim();
-    if ((!content && !files.length && !opts?.regenerateFrom) || busy || !activeChat) return;
+  async function send(
+    text?: string,
+    opts?: { regenerateFrom?: Message[]; editIndex?: number; liveVoice?: boolean }
+  ): Promise<string> {
+    const rawContent = (text ?? input).trim();
+    if ((!rawContent && !files.length && !opts?.regenerateFrom) || busy || !activeChat) return "";
 
     const targetChatId = activeChat.id;
+    const isImageRequest =
+      imageMode || /^\/(?:ciz|çiz|imagine|image)\s+/i.test(rawContent);
+    const cleanPrompt = rawContent.replace(/^\/(?:ciz|çiz|imagine|image)\s+/i, "").trim();
+
+    // Image Generation Branch
+    if (isImageRequest && cleanPrompt) {
+      const userMsg: Message = {
+        id: uid(),
+        role: "user",
+        content: `🎨 Görsel isteği: ${cleanPrompt}`,
+        createdAt: Date.now(),
+      };
+      const updated = [...activeChat.messages, userMsg];
+      patchMessages(targetChatId, updated);
+      setInput("");
+      setImageMode(false);
+      setBusy(true);
+
+      try {
+        const res = await fetch("/api/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: cleanPrompt }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Görsel oluşturulamadı.");
+
+        const imgMsg: Message = {
+          id: uid(),
+          role: "assistant",
+          content: cleanPrompt,
+          imageUrl: data.imageUrl,
+          createdAt: Date.now(),
+        };
+        patchMessages(targetChatId, [...updated, imgMsg]);
+        updateChat(targetChatId, (c) => ({
+          ...c,
+          title: c.title === "Yeni sohbet" ? titleFrom(cleanPrompt) : c.title,
+        }));
+        recordUsage(data.model || "flux", Math.ceil(cleanPrompt.length / 4), 1000, true);
+        return "Görsel oluşturuldu.";
+      } catch (err: any) {
+        patchMessages(targetChatId, [
+          ...updated,
+          {
+            id: uid(),
+            role: "assistant",
+            content: `**Görsel üretim hatası:** ${err?.message || "Bilinmeyen hata"}`,
+            createdAt: Date.now(),
+          },
+        ]);
+        return "";
+      } finally {
+        setBusy(false);
+      }
+    }
+
     const selectedFiles = [...files];
     const meta = selectedFiles.map(({ name, type, size }) => ({ name, type, size }));
     const baseMessages = opts?.regenerateFrom || activeChat.messages;
@@ -537,7 +528,7 @@ export default function Home() {
     } else if (opts?.editIndex !== undefined) {
       outgoing = [
         ...baseMessages.slice(0, opts.editIndex),
-        { id: uid(), role: "user", content, createdAt: Date.now(), attachments: meta },
+        { id: uid(), role: "user", content: rawContent, createdAt: Date.now(), attachments: meta },
       ];
     } else {
       outgoing = [
@@ -545,32 +536,20 @@ export default function Home() {
         {
           id: uid(),
           role: "user",
-          content: content || "Eklediğim dosyaları incele ve açıkla.",
+          content: rawContent || "Eklediğim dosyaları incele ve açıkla.",
           createdAt: Date.now(),
           attachments: meta,
         },
       ];
     }
 
-    const userText = content || "Eklediğim dosyaları incele ve açıkla.";
-
-    if (prefs.codeExecution && !isGroqProvider) {
-      setNotice("Kod çalıştırma aracı yalnızca Groq sağlayıcısında (GPT-OSS 20B/120B) desteklenir.");
-      return;
-    }
-    if (isGroqProvider && (prefs.webSearch || prefs.codeExecution)) {
-      const toolsModel = effectiveModelId || "openai/gpt-oss-20b";
-      if (!/^openai\/gpt-oss-(20b|120b)$/.test(toolsModel)) {
-        setNotice(
-          "Groq Web Arama ve Kod Çalıştırma araçları openai/gpt-oss-20b veya openai/gpt-oss-120b modellerini gerektirir."
-        );
-        return;
-      }
-    }
+    const userText = rawContent || "Eklediğim dosyaları incele ve açıkla.";
 
     if (!opts?.regenerateFrom && prefs.memoryMode === "hybrid") {
-      const candidate = detectMemoryCandidate(userText);
-      if (candidate) addMemory(candidate.text, candidate.category, false);
+      const candidates = detectMemoryCandidates(userText, prefs.autoMemoryExtract);
+      for (const c of candidates) {
+        addMemory(c.text, c.category, false);
+      }
     }
 
     const assistantId = uid();
@@ -592,6 +571,10 @@ export default function Home() {
 
     const controller = new AbortController();
     abortRef.current = controller;
+
+    let accumulatedContent = "";
+    let accumulatedReasoning = "";
+    let receivedSources: RagSource[] = [];
 
     try {
       const supportsTemp =
@@ -616,9 +599,11 @@ export default function Home() {
             temperature: prefs.temperature,
             memoryMode: prefs.memoryMode,
             systemPrompt: prefs.systemPrompt,
+            gemId: activeGem?.id || "",
             gemInstruction: activeGem?.instruction || "",
             webSearch: prefs.webSearch,
             codeExecution: prefs.codeExecution,
+            liveVoice: opts?.liveVoice === true,
           },
           attachments: selectedFiles,
         }),
@@ -630,9 +615,6 @@ export default function Home() {
       }
 
       const contentType = res.headers.get("content-type") || "";
-      let accumulatedContent = "";
-      let accumulatedReasoning = "";
-
       if (contentType.includes("text/event-stream") && res.body) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -654,10 +636,18 @@ export default function Home() {
 
             try {
               const evt = JSON.parse(payloadStr);
-              if (evt.type === "reasoning" && evt.text) {
+              if (evt.type === "sources" && Array.isArray(evt.sources)) {
+                receivedSources = evt.sources;
+              } else if (evt.type === "reasoning" && evt.text) {
                 accumulatedReasoning += evt.text;
               } else if (evt.type === "content" && evt.text) {
                 accumulatedContent += evt.text;
+              } else if (evt.type === "usage" && evt.usage) {
+                recordUsage(
+                  evt.usage.model || effectiveModelId || "default",
+                  Number(evt.usage.promptTokens) || 0,
+                  Number(evt.usage.completionTokens) || 0
+                );
               }
 
               setChats((prev) =>
@@ -672,6 +662,7 @@ export default function Home() {
                             ...m,
                             content: accumulatedContent,
                             reasoning: accumulatedReasoning,
+                            ragSources: receivedSources.length ? receivedSources : undefined,
                           }
                         : m
                     ),
@@ -679,14 +670,10 @@ export default function Home() {
                 })
               );
             } catch {
-              /* ignore malformed frame */
+              /* ignore */
             }
           }
         }
-      } else {
-        const data = await res.json().catch(() => ({}));
-        accumulatedContent = String(data.reply || "Yanıt alınamadı.");
-        accumulatedReasoning = String(data.reasoning || "");
       }
 
       if (!accumulatedContent.trim()) {
@@ -699,17 +686,24 @@ export default function Home() {
         updatedAt: Date.now(),
         messages: c.messages.map((m) =>
           m.id === assistantId
-            ? { ...m, content: accumulatedContent, reasoning: accumulatedReasoning }
+            ? {
+                ...m,
+                content: accumulatedContent,
+                reasoning: accumulatedReasoning,
+                ragSources: receivedSources.length ? receivedSources : undefined,
+              }
             : m
         ),
       }));
 
-      if (prefs.voiceResponses && "speechSynthesis" in window) {
+      if (prefs.voiceResponses && !opts?.liveVoice && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(accumulatedContent);
         utterance.lang = "tr-TR";
         window.speechSynthesis.speak(utterance);
       }
+
+      return accumulatedContent;
     } catch (error: any) {
       if (error?.name === "AbortError") {
         setNotice("Yanıt oluşturma durduruldu.");
@@ -722,35 +716,19 @@ export default function Home() {
             m.id === assistantId
               ? {
                   ...m,
-                  content: `**Bağlantı hatası**\n${message}\n\nAPI anahtarını, modelini ve sağlayıcı limitlerini kontrol et.`,
+                  content: `**Bağlantı hatası**\n${message}`,
                 }
               : m
           ),
         }));
       }
+      return "";
     } finally {
       abortRef.current = null;
       setBusy(false);
       setStreamingMessageId(null);
       markDirty(targetChatId);
     }
-  }
-
-  function regenerate() {
-    if (!activeChat || busy) return;
-    const lastUserIndex = activeChat.messages.map((m) => m.role).lastIndexOf("user");
-    if (lastUserIndex < 0) return;
-    void send(undefined, { regenerateFrom: activeChat.messages.slice(0, lastUserIndex + 1) });
-  }
-
-  function editMessage(message: Message) {
-    if (!activeChat) return;
-    const index = activeChat.messages.findIndex((m) => m.id === message.id);
-    if (index < 0) return;
-    setInput(message.content);
-    setEditingMessageId(message.id);
-    setNotice("Mesajı düzenliyorsun. Gönderdiğinde bu mesajdan sonraki yanıtlar yenilenir.");
-    textareaRef.current?.focus();
   }
 
   function submitComposer() {
@@ -763,9 +741,7 @@ export default function Home() {
     }
     void send();
   }
-  submitComposerRef.current = submitComposer;
 
-  // Fixed toggleable voice dictation
   function toggleDictate() {
     const w = window as any;
     const Speech = w.SpeechRecognition || w.webkitSpeechRecognition;
@@ -781,165 +757,16 @@ export default function Home() {
     const rec = new Speech();
     rec.lang = "tr-TR";
     rec.interimResults = false;
-    rec.maxAlternatives = 1;
     recognitionRef.current = rec;
     setIsRecording(true);
     rec.onresult = (event: any) =>
       setInput((prev) => `${prev}${prev ? " " : ""}${event.results?.[0]?.[0]?.transcript || ""}`);
-    rec.onerror = () => {
-      setIsRecording(false);
-      setNotice("Ses tanıma tamamlanamadı.");
-    };
+    rec.onerror = () => setIsRecording(false);
     rec.onend = () => {
       setIsRecording(false);
       recognitionRef.current = null;
     };
     rec.start();
-  }
-
-  async function copyText(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      setNotice("Panoya kopyalandı.");
-    } catch {
-      setNotice("Kopyalama izni alınamadı.");
-    }
-  }
-
-  function speak(text: string) {
-    if (!("speechSynthesis" in window)) {
-      setNotice("Sesli okuma bu tarayıcıda desteklenmiyor.");
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "tr-TR";
-    window.speechSynthesis.speak(u);
-  }
-
-  function exportActive() {
-    if (!activeChat) return;
-    const content = activeChat.messages
-      .map(
-        (m) =>
-          `${m.role === "user" ? "## Sen" : "## NEXUS"}\n\n${m.content}${
-            m.attachments?.length
-              ? `\n\nDosyalar: ${m.attachments.map((a) => a.name).join(", ")}`
-              : ""
-          }`
-      )
-      .join("\n\n---\n\n");
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    downloadBlob(
-      blob,
-      `nexus-${activeChat.title.replace(/[^a-z0-9-_ğüşöçıİĞÜŞÖÇ]+/gi, "-").slice(0, 45)}.md`
-    );
-  }
-
-  function exportAll() {
-    const backup = {
-      app: "NEXUS AI",
-      version: "3.1.0",
-      exportedAt: new Date().toISOString(),
-      chats,
-      prefs,
-    };
-    downloadBlob(
-      new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }),
-      `nexus-yedek-${new Date().toISOString().slice(0, 10)}.json`
-    );
-  }
-
-  function downloadBlob(blob: Blob, name: string) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function importBackup(file?: File) {
-    if (!file) return;
-    try {
-      const parsed = JSON.parse(await file.text());
-      const incoming = Array.isArray(parsed) ? parsed : parsed.chats;
-      if (!Array.isArray(incoming)) throw new Error("Yedek dosyasında sohbet listesi bulunamadı.");
-      const imported: Chat[] = incoming
-        .slice(0, 500)
-        .filter((c: any) => c && Array.isArray(c.messages))
-        .map((c: any) => {
-          const newId = uid();
-          markDirty(newId);
-          return {
-            id: newId,
-            title: String(c.title || "İçe aktarılan sohbet").slice(0, 100),
-            messages: safeMessageList(c.messages),
-            updatedAt: Date.now(),
-            pinned: Boolean(c.pinned),
-            archived: Boolean(c.archived),
-          };
-        });
-      if (!imported.length) throw new Error("İçe aktarılabilecek sohbet bulunamadı.");
-      setChats((prev) => [...imported, ...prev]);
-      setActiveId(imported[0].id);
-      setNotice(`${imported.length} sohbet içe aktarıldı.`);
-      if (parsed.prefs && typeof parsed.prefs === "object") {
-        setPrefs((p) => ({
-          ...p,
-          ...parsed.prefs,
-          memoryItems: Array.isArray(parsed.prefs.memoryItems)
-            ? parsed.prefs.memoryItems.slice(0, 100)
-            : p.memoryItems,
-        }));
-      }
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Yedek dosyası okunamadı.");
-    } finally {
-      if (importRef.current) importRef.current.value = "";
-    }
-  }
-
-  async function logout() {
-    stopGeneration();
-    await supabase.auth.signOut();
-    setChats([]);
-    setPrefs(DEFAULT_PREFS);
-    setUserId("");
-    setEmail("");
-    router.replace("/login");
-    router.refresh();
-  }
-
-  async function clearAllChats() {
-    if (
-      !window.confirm(
-        "Tüm sohbetlerin bu hesaptan silinecek. Bu işlem geri alınamaz. Devam edilsin mi?"
-      )
-    )
-      return;
-    await supabase.from("nexus_chats").delete().eq("user_id", userId);
-    const fresh = newChat();
-    prevChatIdsRef.current = new Set([fresh.id]);
-    markDirty(fresh.id);
-    setChats([fresh]);
-    setActiveId(fresh.id);
-    setNotice("Sohbet geçmişi temizlendi.");
-  }
-
-  function handleSaveGem(gem: Gem) {
-    setPrefs((p) => {
-      const exists = p.gems.some((g) => g.id === gem.id);
-      return {
-        ...p,
-        gems: exists ? p.gems.map((g) => (g.id === gem.id ? gem : g)) : [gem, ...p.gems],
-      };
-    });
-    createChat(gem.id);
-  }
-
-  function handleDeleteGem(id: string) {
-    setPrefs((p) => ({ ...p, gems: p.gems.filter((g) => g.id !== id) }));
   }
 
   if (loading || !userId) {
@@ -950,7 +777,7 @@ export default function Home() {
             <Sparkles size={24} />
           </div>
           <strong>
-            NEXUS<span>3.1</span>
+            NEXUS<span>3.2</span>
           </strong>
           <small>ÇALIŞMA ALANI HAZIRLANIYOR</small>
           <i />
@@ -1005,9 +832,22 @@ export default function Home() {
           setActiveId(id);
           if (window.innerWidth <= 820) setMobileMenu(false);
         }}
-        onRenameChat={renameChat}
-        onToggleChatFlag={toggleChat}
-        onDeleteChat={deleteChat}
+        onRenameChat={(chat) => {
+          const name = window.prompt("Sohbet adını yaz:", chat.title);
+          if (name?.trim()) updateChat(chat.id, (c) => ({ ...c, title: name.trim().slice(0, 100) }));
+        }}
+        onToggleChatFlag={(id, key) =>
+          updateChat(id, (c) => ({ ...c, [key]: !c[key], updatedAt: Date.now() }))
+        }
+        onDeleteChat={(id) => {
+          if (!window.confirm("Bu sohbet silinsin mi?")) return;
+          const left = chats.filter((c) => c.id !== id);
+          const next = left.length ? left : [newChat()];
+          if (!left.length) markDirty(next[0].id);
+          setChats(next);
+          if (activeId === id) setActiveId(next[0].id);
+          void supabase.from("nexus_chats").delete().eq("id", id).eq("user_id", userId);
+        }}
         gems={allGems}
         activeGemId={activeChat?.gemId}
         onOpenGemModal={(gem) => setGemModalState({ open: true, gem })}
@@ -1019,7 +859,12 @@ export default function Home() {
           setMobileMenu(false);
         }}
         email={email}
-        onLogout={logout}
+        onLogout={async () => {
+          stopGeneration();
+          await supabase.auth.signOut();
+          router.replace("/login");
+          router.refresh();
+        }}
       />
 
       <div className="workspace-split">
@@ -1041,13 +886,26 @@ export default function Home() {
                 prev
                   ? null
                   : {
-                      title: "taslak.md",
-                      language: "markdown",
-                      content: "# NEXUS Canvas\n\nBurada kod veya metin düzenleyebilirsin.",
+                      title: "App.jsx",
+                      language: "jsx",
+                      content:
+                        "export default function App() {\n  const [count, setCount] = useState(0);\n  return (\n    <div className=\"p-8 text-center\">\n      <h1 className=\"text-2xl font-bold mb-4\">NEXUS Canvas 2.0</h1>\n      <button onClick={() => setCount(c => c + 1)} className=\"px-4 py-2 bg-blue-600 text-white rounded-lg\">\n        Tıklandı: {count}\n      </button>\n    </div>\n  );\n}",
                     }
               )
             }
-            onExportChat={exportActive}
+            onExportChat={() => {
+              if (!activeChat) return;
+              const md = activeChat.messages
+                .map((m) => `## ${m.role === "user" ? "Sen" : "NEXUS"}\n\n${m.content}`)
+                .join("\n\n---\n\n");
+              const blob = new Blob([md], { type: "text/plain;charset=utf-8" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "nexus-sohbet.md";
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
             onOpenSettings={() => {
               setSettingsTab("general");
               setShowSettings(true);
@@ -1067,12 +925,36 @@ export default function Home() {
             endRef={endRef}
             onSelectStarterPrompt={(p) => setInput(p)}
             onTriggerFileUpload={() => fileRef.current?.click()}
-            onCopyText={(t) => void copyText(t)}
-            onEditMessage={editMessage}
-            onSpeakText={speak}
-            onRegenerate={regenerate}
+            onCopyText={(t) => {
+              void navigator.clipboard.writeText(t);
+              setNotice("Panoya kopyalandı.");
+            }}
+            onEditMessage={(m) => {
+              if (!activeChat) return;
+              setInput(m.content);
+              setEditingMessageId(m.id);
+              textareaRef.current?.focus();
+            }}
+            onSpeakText={(t) => {
+              if (!("speechSynthesis" in window)) return;
+              window.speechSynthesis.cancel();
+              const u = new SpeechSynthesisUtterance(t);
+              u.lang = "tr-TR";
+              window.speechSynthesis.speak(u);
+            }}
+            onRegenerate={() => {
+              if (!activeChat || busy) return;
+              const idx = activeChat.messages.map((m) => m.role).lastIndexOf("user");
+              if (idx >= 0) void send(undefined, { regenerateFrom: activeChat.messages.slice(0, idx + 1) });
+            }}
             onQuickRefine={(inst) => void send(inst)}
-            onOpenCanvas={(doc) => setCanvasDoc(doc)}
+            onOpenCanvas={(doc) =>
+              setCanvasDoc({
+                ...doc,
+                versions: [{ id: uid(), label: "v1", content: doc.content, createdAt: Date.now() }],
+                activeVersionIndex: 0,
+              })
+            }
           />
 
           <Composer
@@ -1087,7 +969,6 @@ export default function Home() {
             onCancelEdit={() => {
               setEditingMessageId(null);
               setInput("");
-              setNotice("");
             }}
             files={files}
             onRemoveFile={(idx) => setFiles((prev) => prev.filter((_, j) => j !== idx))}
@@ -1102,6 +983,9 @@ export default function Home() {
             onToggleCodeExecution={() =>
               setPrefs((p) => ({ ...p, codeExecution: !p.codeExecution }))
             }
+            imageMode={imageMode}
+            onToggleImageMode={() => setImageMode((v) => !v)}
+            onOpenLiveVoice={() => setLiveVoiceOpen(true)}
             isGroqProvider={isGroqProvider}
             onEnhancePrompt={() => setInput(buildEnhancedPrompt(input))}
             modelLabel={effectiveModelId}
@@ -1114,16 +998,35 @@ export default function Home() {
             onChange={setCanvasDoc}
             onClose={() => setCanvasDoc(null)}
             onAskNexusRefine={(prompt) => void send(prompt)}
+            onNotify={(msg) => setNotice(msg)}
           />
         )}
       </div>
+
+      <LiveVoiceModal
+        open={liveVoiceOpen}
+        onClose={() => setLiveVoiceOpen(false)}
+        onSendVoiceMessage={(transcript) => send(transcript, { liveVoice: true })}
+      />
 
       {gemModalState.open && (
         <GemModal
           gem={gemModalState.gem}
           models={models}
-          onSave={handleSaveGem}
-          onDelete={handleDeleteGem}
+          onSave={(gem) => {
+            setPrefs((p) => {
+              const exists = p.gems.some((g) => g.id === gem.id);
+              return {
+                ...p,
+                gems: exists ? p.gems.map((g) => (g.id === gem.id ? gem : g)) : [gem, ...p.gems],
+              };
+            });
+            createChat(gem.id);
+          }}
+          onDelete={(id) => {
+            void fetch(`/api/gems/docs?gemId=${encodeURIComponent(id)}`, { method: "DELETE" });
+            setPrefs((p) => ({ ...p, gems: p.gems.filter((g) => g.id !== id) }));
+          }}
           onClose={() => setGemModalState({ open: false })}
         />
       )}
@@ -1141,11 +1044,9 @@ export default function Home() {
             fetch("/api/models", { cache: "no-store" })
               .then(async (r) => {
                 const d = await r.json();
-                if (!r.ok) throw new Error(d.error);
-                setModels(d.models || []);
-                setModelsError("");
+                if (r.ok) setModels(d.models || []);
               })
-              .catch((e) => setModelsError(e.message));
+              .catch(() => {});
           }}
           provider={provider}
           configured={configured}
@@ -1153,10 +1054,36 @@ export default function Home() {
           chatsCount={chats.length}
           email={email}
           importRef={importRef}
-          onExportAll={exportAll}
-          onImportBackup={(f) => void importBackup(f)}
-          onClearAllChats={() => void clearAllChats()}
-          onLogout={() => void logout()}
+          onExportAll={() => {
+            const backup = { app: "NEXUS AI", version: "3.2.0", chats, prefs };
+            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "nexus-3.2-yedek.json";
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          onImportBackup={async (file) => {
+            if (!file) return;
+            const parsed = JSON.parse(await file.text());
+            if (Array.isArray(parsed?.chats)) {
+              setChats((prev) => [...parsed.chats, ...prev]);
+              setNotice("Yedek içe aktarıldı.");
+            }
+          }}
+          onClearAllChats={async () => {
+            if (!window.confirm("Tüm sohbetler silinsin mi?")) return;
+            await supabase.from("nexus_chats").delete().eq("user_id", userId);
+            const fresh = newChat();
+            markDirty(fresh.id);
+            setChats([fresh]);
+            setActiveId(fresh.id);
+          }}
+          onLogout={async () => {
+            await supabase.auth.signOut();
+            router.replace("/login");
+          }}
           onAddMemory={addMemory}
         />
       )}

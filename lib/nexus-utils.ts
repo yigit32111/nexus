@@ -61,6 +61,8 @@ export function safeMessageList(value: unknown): Message[] {
       role: m.role as "user" | "assistant",
       content: m.content.slice(0, 80000),
       reasoning: typeof m.reasoning === "string" ? m.reasoning.slice(0, 40000) : undefined,
+      imageUrl: typeof m.imageUrl === "string" ? m.imageUrl : undefined,
+      ragSources: Array.isArray(m.ragSources) ? m.ragSources.slice(0, 6) : undefined,
       createdAt: Number(m.createdAt) || Date.now(),
       attachments: Array.isArray(m.attachments)
         ? m.attachments.slice(0, MAX_FILES).map((a: any) => ({
@@ -103,11 +105,17 @@ export function extractThinkingTags(
   return { thinking, cleanContent: text, isThinkingOpen };
 }
 
-export function detectMemoryCandidate(
-  text: string
-): { text: string; category: MemoryCategory } | null {
+/**
+ * Autonomous & explicit memory detector for natural Turkish conversations.
+ */
+export function detectMemoryCandidates(
+  text: string,
+  autonomous = true
+): { text: string; category: MemoryCategory }[] {
+  const results: { text: string; category: MemoryCategory }[] = [];
   const trimmed = text.trim();
-  const patterns: { regex: RegExp; category: MemoryCategory }[] = [
+
+  const explicitPatterns: { regex: RegExp; category: MemoryCategory }[] = [
     { regex: /^(?:hatırla|aklında tut|unutma)\s+(.{4,220})/i, category: "Diğer" },
     { regex: /^(?:benim adım|adım)\s+(.{3,100})/i, category: "Profil" },
     {
@@ -118,17 +126,71 @@ export function detectMemoryCandidate(
     { regex: /^(?:projem|üzerinde çalıştığım proje)\s+(.{4,180})/i, category: "Proje" },
   ];
 
-  for (const p of patterns) {
+  for (const p of explicitPatterns) {
     const res = trimmed.match(p.regex);
     if (res?.[1]) {
-      return { text: res[1], category: p.category };
+      results.push({ text: res[1].trim(), category: p.category });
     }
   }
-  return null;
+
+  if (autonomous && results.length === 0) {
+    const autoPatterns: { regex: RegExp; category: MemoryCategory; prefix?: string }[] = [
+      {
+        regex: /\bben\s+(?:bir\s+)?([a-zçğıöşü0-9\s-]{3,45}(?:mühendisiyim|geliştiricisiyim|öğrencisiyim|tasarımcısıyım|doktoruyum|öğretmeniyim|uzmanıyım))\b/i,
+        category: "Profil",
+        prefix: "Meslek/Rol: ",
+      },
+      {
+        regex: /\b([a-zçğıöşü0-9\s-]{3,40})\s+(?:şehrinde|ilinde)\s+yaşıyorum\b/i,
+        category: "Profil",
+        prefix: "Konum: ",
+      },
+      {
+        regex: /\b(?:genellikle|çoğunlukla|her zaman)\s+([a-zçğıöşü0-9+#.\s-]{3,80})\s+(?:kullanıyorum|tercih ediyorum)\b/i,
+        category: "Tercih",
+        prefix: "Tercih: ",
+      },
+      {
+        regex: /\b(?:geliştirdiğim|üzerinde çalıştığım)\s+([a-zçğıöşü0-9\s-]{3,80})\s+(?:uygulaması|projesi|sitesi|sistemi)\b/i,
+        category: "Proje",
+        prefix: "Aktif proje: ",
+      },
+    ];
+
+    for (const ap of autoPatterns) {
+      const m = trimmed.match(ap.regex);
+      if (m?.[1]) {
+        results.push({
+          text: `${ap.prefix || ""}${m[1].trim()}`,
+          category: ap.category,
+        });
+      }
+    }
+  }
+
+  return results;
 }
 
 export function buildEnhancedPrompt(raw: string): string {
   const clean = raw.trim();
   if (!clean) return "";
   return `Aşağıdaki isteği derinlemesine, yapılandırılmış ve uygulanabilir şekilde yanıtla. Gerekirse adım adım plan, somut örnekler ve dikkat edilmesi gereken kritik noktaları ekle:\n\n"${clean}"`;
+}
+
+export function chunkText(text: string, chunkSize = 1000, overlap = 180): string[] {
+  const clean = text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (!clean) return [];
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < clean.length && chunks.length < 60) {
+    const end = Math.min(start + chunkSize, clean.length);
+    chunks.push(clean.slice(start, end).trim());
+    if (end >= clean.length) break;
+    start += chunkSize - overlap;
+  }
+  return chunks.filter(Boolean);
+}
+
+export function estimateTokens(text: string): number {
+  return Math.max(1, Math.ceil(text.length / 4));
 }

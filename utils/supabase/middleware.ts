@@ -37,6 +37,7 @@ export async function updateSession(request: NextRequest) {
     pathname === "/login" ||
     pathname === "/reset-password" ||
     pathname.startsWith("/auth/callback") ||
+    pathname.startsWith("/share") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico";
   const isApiRoute = pathname.startsWith("/api/");

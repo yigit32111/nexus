@@ -3,6 +3,7 @@
 import { RefObject, useState } from "react";
 import {
   Activity,
+  BarChart3,
   Brain,
   Check,
   CheckCheck,
@@ -22,11 +23,11 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { MemoryCategory, ModelInfo, Prefs } from "../types/nexus";
+import { EMPTY_USAGE_STATS, MemoryCategory, ModelInfo, Prefs } from "../types/nexus";
 
 type SettingsModalProps = {
-  tab: "general" | "gems" | "memory" | "account" | "system";
-  onChangeTab: (tab: "general" | "gems" | "memory" | "account" | "system") => void;
+  tab: "general" | "gems" | "memory" | "analytics" | "account" | "system";
+  onChangeTab: (tab: "general" | "gems" | "memory" | "analytics" | "account" | "system") => void;
   onClose: () => void;
   prefs: Prefs;
   onUpdatePrefs: (updater: (prev: Prefs) => Prefs) => void;
@@ -73,6 +74,11 @@ export function SettingsModal({
   const [editingMemoryText, setEditingMemoryText] = useState("");
 
   const approvedMemory = prefs.memoryItems.filter((m) => m.approved);
+  const stats = prefs.usageStats || EMPTY_USAGE_STATS;
+  const totalTokens = stats.totalPromptTokens + stats.totalCompletionTokens;
+  const modelEntries = Object.entries(stats.byModel || {}).sort(
+    (a, b) => b[1].tokens - a[1].tokens
+  );
 
   function saveMemoryEdit(id: string) {
     const value = editingMemoryText.trim().replace(/\s+/g, " ");
@@ -98,9 +104,9 @@ export function SettingsModal({
       <section className="settings-dialog">
         <header className="settings-header">
           <div>
-            <div className="settings-eyebrow">NEXUS CONTROL CENTER</div>
+            <div className="settings-eyebrow">NEXUS 3.2 CONTROL CENTER</div>
             <h2>Ayarlar</h2>
-            <p>Çalışma alanını ve kişisel deneyimini yönet.</p>
+            <p>Çalışma alanını, hafızanı ve kullanım istatistiklerini yönet.</p>
           </div>
           <button type="button" className="icon-button" onClick={onClose}>
             <X size={18} />
@@ -122,6 +128,13 @@ export function SettingsModal({
               onClick={() => onChangeTab("memory")}
             >
               <Brain size={16} /> Hafıza <span>{approvedMemory.length}</span>
+            </button>
+            <button
+              type="button"
+              className={tab === "analytics" ? "selected" : ""}
+              onClick={() => onChangeTab("analytics")}
+            >
+              <BarChart3 size={16} /> Analitik
             </button>
             <button
               type="button"
@@ -259,10 +272,6 @@ export function SettingsModal({
                     onUpdatePrefs((p) => ({ ...p, temperature: Number(e.target.value) / 100 }))
                   }
                 />
-                <div className="range-ends">
-                  <span>Daha tutarlı</span>
-                  <span>Daha yaratıcı</span>
-                </div>
 
                 <div className="setting-divider" />
                 <div className="settings-section-title">GELİŞMİŞ ARAÇLAR</div>
@@ -292,8 +301,6 @@ export function SettingsModal({
                     />
                   </label>
                 )}
-
-                <div className="setting-divider" />
                 <label className="toggle-setting">
                   <span>
                     <Volume2 size={16} /> Yanıtları otomatik seslendir
@@ -316,9 +323,6 @@ export function SettingsModal({
                   }
                   placeholder="NEXUS'un yanıtlarında uymasını istediğin ek tercihleri yaz…"
                 />
-                <small className="field-hint">
-                  Bu talimat her istekte modele eklenir. Parola veya gizli bilgi yazma.
-                </small>
               </>
             )}
 
@@ -326,9 +330,22 @@ export function SettingsModal({
               <>
                 <div className="settings-section-title">KİŞİSEL HAFIZA</div>
                 <p className="settings-description">
-                  NEXUS yalnızca onayladığın kayıtları yanıtlarında kullanır. Öneriler sen
-                  onaylayana kadar etkin değildir.
+                  NEXUS yalnızca onayladığın kayıtları yanıtlarında kullanır. Otonom çıkarım açık
+                  olduğunda sohbet içindeki meslek, proje ve tercih bilgilerini otomatik önerir.
                 </p>
+
+                <label className="toggle-setting">
+                  <span>
+                    <Brain size={16} /> Otonom hafıza çıkarımı (sohbetten otomatik algıla)
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={prefs.autoMemoryExtract}
+                    onChange={(e) =>
+                      onUpdatePrefs((p) => ({ ...p, autoMemoryExtract: e.target.checked }))
+                    }
+                  />
+                </label>
 
                 <label className="setting-label">Hafıza modu</label>
                 <div className="segmented three memory-modes">
@@ -434,18 +451,10 @@ export function SettingsModal({
                         <div className="memory-entry-actions">
                           {editingMemory === item.id ? (
                             <>
-                              <button
-                                type="button"
-                                onClick={() => saveMemoryEdit(item.id)}
-                                title="Kaydet"
-                              >
+                              <button type="button" onClick={() => saveMemoryEdit(item.id)}>
                                 <Check size={14} />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditingMemory(null)}
-                                title="İptal"
-                              >
+                              <button type="button" onClick={() => setEditingMemory(null)}>
                                 <X size={14} />
                               </button>
                             </>
@@ -457,7 +466,6 @@ export function SettingsModal({
                                   setEditingMemory(item.id);
                                   setEditingMemoryText(item.text);
                                 }}
-                                title="Düzenle"
                               >
                                 <Pencil size={14} />
                               </button>
@@ -473,7 +481,6 @@ export function SettingsModal({
                                       ),
                                     }))
                                   }
-                                  title="Onayla"
                                 >
                                   <Check size={14} />
                                 </button>
@@ -487,7 +494,6 @@ export function SettingsModal({
                                     memoryItems: p.memoryItems.filter((m) => m.id !== item.id),
                                   }))
                                 }
-                                title="Sil"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -496,28 +502,77 @@ export function SettingsModal({
                         </div>
                       </div>
                     ))}
-                  {!prefs.memoryItems.length && (
-                    <div className="memory-empty">
-                      <Brain size={24} />
-                      <b>Henüz kayıt yok</b>
-                      <span>Yeni bir bilgi ekleyerek kişisel hafızanı oluştur.</span>
-                    </div>
-                  )}
                 </div>
 
-                <div className="memory-footer">
-                  <ShieldCheck size={14} /> Hafıza bu hesaba özel bulut ayarlarında saklanır.
-                </div>
                 <button
                   type="button"
                   className="clear-memory-button"
                   onClick={() => {
-                    if (window.confirm("Bu hesaptaki tüm hafıza kayıtları silinsin mi?")) {
+                    if (window.confirm("Tüm hafıza kayıtları silinsin mi?")) {
                       onUpdatePrefs((p) => ({ ...p, memoryItems: [] }));
                     }
                   }}
                 >
                   <Trash2 size={13} /> Tüm hafızayı temizle
+                </button>
+              </>
+            )}
+
+            {tab === "analytics" && (
+              <>
+                <div className="settings-section-title">KULLANIM VE TOKEN ANALİTİĞİ</div>
+                <p className="settings-description">
+                  Model bazlı mesaj ve tahmini token tüketimi özeti.
+                </p>
+
+                <div className="memory-stats">
+                  <div>
+                    <b>{stats.totalMessages}</b>
+                    <span>Toplam Yanıt</span>
+                  </div>
+                  <div>
+                    <b>{totalTokens.toLocaleString("tr-TR")}</b>
+                    <span>Tahmini Token</span>
+                  </div>
+                  <div>
+                    <b>{stats.totalImages}</b>
+                    <span>Üretilen Görsel</span>
+                  </div>
+                </div>
+
+                <label className="setting-label spaced">Model Bazlı Dağılım</label>
+                <div className="analytics-model-list">
+                  {modelEntries.length > 0 ? (
+                    modelEntries.map(([modelName, info]) => {
+                      const pct =
+                        totalTokens > 0 ? Math.min(100, Math.round((info.tokens / totalTokens) * 100)) : 0;
+                      return (
+                        <div key={modelName} className="analytics-row">
+                          <div className="analytics-row-head">
+                            <b>{modelName}</b>
+                            <span>
+                              {info.messages} yanıt · {info.tokens.toLocaleString("tr-TR")} token
+                            </span>
+                          </div>
+                          <div className="analytics-bar-track">
+                            <div className="analytics-bar-fill" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="empty-history">Henüz kullanım verisi kaydedilmedi.</div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  className="clear-memory-button"
+                  onClick={() =>
+                    onUpdatePrefs((p) => ({ ...p, usageStats: EMPTY_USAGE_STATS }))
+                  }
+                >
+                  <Trash2 size={13} /> Sayaçları sıfırla
                 </button>
               </>
             )}
@@ -536,23 +591,12 @@ export function SettingsModal({
                   </div>
                 </div>
 
-                <div className="privacy-card">
-                  <ShieldCheck size={18} />
-                  <div>
-                    <b>Kullanıcı verileri ayrılmış durumda</b>
-                    <p>
-                      Sohbet ve ayar kayıtları oturum açmış kullanıcının kimliğiyle saklanır ve
-                      Supabase RLS politikalarıyla korunur.
-                    </p>
-                  </div>
-                </div>
-
                 <div className="account-actions">
                   <button type="button" onClick={onExportAll}>
                     <Download size={15} /> Tüm verilerimi yedekle (.json)
                   </button>
                   <button type="button" onClick={() => importRef.current?.click()}>
-                    <Upload size={15} /> Yedek dosyası içe aktar
+                    <Upload size={15} /> Yedek dosyasını içe aktar
                   </button>
                   <input
                     hidden
@@ -589,7 +633,7 @@ export function SettingsModal({
                 </div>
 
                 {[
-                  ["Uygulama sürümü", "NEXUS AI 3.1 (Streaming + Canvas + Gems)"],
+                  ["Uygulama sürümü", "NEXUS AI 3.2 (RAG + Canvas 2.0 + Image + Live)"],
                   ["Hesap oturumu", "Aktif"],
                   ["Hafıza kayıtları", String(prefs.memoryItems.length)],
                   ["Özel Gem sayısı", String(prefs.gems.length)],
@@ -604,9 +648,8 @@ export function SettingsModal({
 
                 {modelsError && <p className="inline-warning">{modelsError}</p>}
                 <div className="system-note">
-                  <CircleHelp size={15} /> OpenRouter yapılandırıldığında Web düğmesi etkin
-                  modelle canlı arama (:online) kullanır; Groq yapılandırıldığında ise GPT-OSS
-                  20B/120B araçları etkinleşir.
+                  <CircleHelp size={15} /> Gem Bilgi Bankası için Supabase SQL Editor üzerinde
+                  20261126200000_nexus_32_features.sql betiğinin çalıştırıldığından emin ol.
                 </div>
               </>
             )}

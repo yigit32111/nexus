@@ -6,10 +6,12 @@ import {
   FileText,
   Globe,
   Image as ImageIcon,
+  ImagePlus,
   LockKeyhole,
   Mic,
   Paperclip,
   Pencil,
+  Radio,
   Send,
   Wand2,
   X,
@@ -38,6 +40,9 @@ type ComposerProps = {
   onToggleWebSearch: () => void;
   codeExecution: boolean;
   onToggleCodeExecution: () => void;
+  imageMode: boolean;
+  onToggleImageMode: () => void;
+  onOpenLiveVoice: () => void;
   isGroqProvider: boolean;
   onEnhancePrompt: () => void;
   modelLabel: string;
@@ -64,6 +69,9 @@ export function Composer({
   onToggleWebSearch,
   codeExecution,
   onToggleCodeExecution,
+  imageMode,
+  onToggleImageMode,
+  onOpenLiveVoice,
   isGroqProvider,
   onEnhancePrompt,
   modelLabel,
@@ -135,7 +143,11 @@ export function Composer({
               onSubmit();
             }
           }}
-          placeholder="NEXUS'a sor (ekran görüntüsü yapıştırabilir veya dosya sürükleyebilirsin)"
+          placeholder={
+            imageMode
+              ? "Üretmek istediğin görseli detaylı tarif et (ör. Siberpunk İstanbul gecesi, 8k)…"
+              : "NEXUS'a sor (görsel yapıştırabilir veya dosya sürükleyebilirsin)"
+          }
           rows={1}
           disabled={busy}
         />
@@ -169,6 +181,24 @@ export function Composer({
 
             <button
               type="button"
+              onClick={onOpenLiveVoice}
+              title="NEXUS Live — Tam ekran eller serbest sesli sohbet"
+            >
+              <Radio size={17} />
+            </button>
+
+            <button
+              type="button"
+              className={`composer-tool-toggle ${imageMode ? "active" : ""}`}
+              onClick={onToggleImageMode}
+              title="Görsel üretim modunu aç/kapat"
+            >
+              <ImagePlus size={15} />
+              <span>Görsel</span>
+            </button>
+
+            <button
+              type="button"
               className={`composer-tool-toggle ${webSearch ? "active" : ""}`}
               onClick={onToggleWebSearch}
               title="Web aramasını aç/kapat"
@@ -189,7 +219,7 @@ export function Composer({
               </button>
             )}
 
-            {input.trim().length >= 6 && !busy && (
+            {input.trim().length >= 6 && !busy && !imageMode && (
               <button
                 type="button"
                 className="composer-tool-toggle"

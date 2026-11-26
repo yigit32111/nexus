@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Sparkles, Trash2, X } from "lucide-react";
-import { Gem, ModelInfo } from "../types/nexus";
-import { uid } from "../lib/nexus-utils";
+import { useRef, useState } from "react";
+import { FileText, FileUp, Sparkles, Trash2, X } from "lucide-react";
+import { Gem, GemDocMeta, ModelInfo } from "../types/nexus";
+import { bytesLabel, fileToDataUrl, uid } from "../lib/nexus-utils";
 import { renderGemIcon } from "./Sidebar";
 
 type GemModalProps = {
@@ -17,22 +17,68 @@ type GemModalProps = {
 const ICONS: Gem["icon"][] = ["sparkles", "code", "search", "pen", "graduation"];
 
 export function GemModal({ gem, models, onSave, onDelete, onClose }: GemModalProps) {
+  const [gemId] = useState(() => gem?.id || uid());
   const [name, setName] = useState(gem?.name || "");
   const [description, setDescription] = useState(gem?.description || "");
   const [instruction, setInstruction] = useState(gem?.instruction || "");
   const [icon, setIcon] = useState<Gem["icon"]>(gem?.icon || "sparkles");
   const [model, setModel] = useState(gem?.model || "");
+  const [documents, setDocuments] = useState<GemDocMeta[]>(gem?.documents || []);
+  const [uploading, setUploading] = useState(false);
+  const [docError, setDocError] = useState("");
+  const docInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleDocUpload(list: FileList | null) {
+    if (!list?.length) return;
+    setUploading(true);
+    setDocError("");
+
+    try {
+      for (const file of Array.from(list).slice(0, 4)) {
+        const dataUrl = await fileToDataUrl(file);
+        const res = await fetch("/api/gems/docs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            gemId,
+            fileName: file.name,
+            fileType: file.type || "text/plain",
+            dataUrl,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Doküman yüklenemedi.");
+        setDocuments((prev) => [
+          ...prev,
+          { id: data.id, name: data.name, size: data.size, chunkCount: data.chunkCount },
+        ]);
+      }
+    } catch (err: any) {
+      setDocError(err?.message || "Dosya eklenemedi.");
+    } finally {
+      setUploading(false);
+      if (docInputRef.current) docInputRef.current.value = "";
+    }
+  }
+
+  async function handleRemoveDoc(docId: string) {
+    setDocuments((prev) => prev.filter((d) => d.id !== docId));
+    await fetch(`/api/gems/docs?docId=${encodeURIComponent(docId)}`, {
+      method: "DELETE",
+    }).catch(() => {});
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !instruction.trim()) return;
     onSave({
-      id: gem?.id || uid(),
+      id: gemId,
       name: name.trim().slice(0, 48),
       description: description.trim().slice(0, 120) || "Özel NEXUS asistanı",
       instruction: instruction.trim().slice(0, 2000),
       icon,
       model: model || undefined,
+      documents,
     });
     onClose();
   }
@@ -47,9 +93,9 @@ export function GemModal({ gem, models, onSave, onDelete, onClose }: GemModalPro
       <section className="gem-dialog">
         <header className="settings-header">
           <div>
-            <div className="settings-eyebrow">NEXUS GEMS</div>
+            <div className="settings-eyebrow">NEXUS GEMS · BİLGİ BANKASI</div>
             <h2>{gem ? "Gem'i Düzenle" : "Yeni Gem Oluştur"}</h2>
-            <p>Belirli bir görev veya uzmanlık alanı için özel yapay zekâ personası tanımla.</p>
+            <p>Özel sistem talimatı ve kalıcı referans dosyaları (RAG) tanımla.</p>
           </div>
           <button type="button" className="icon-button" onClick={onClose}>
             <X size={18} />
@@ -74,7 +120,7 @@ export function GemModal({ gem, models, onSave, onDelete, onClose }: GemModalPro
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Örn: React Uzmanı, İngilizce Koçu…"
+              placeholder="Örn: Hukuk Danışmanı, Proje Mimarı…"
               required
             />
           </div>
@@ -90,12 +136,57 @@ export function GemModal({ gem, models, onSave, onDelete, onClose }: GemModalPro
           <label className="setting-label">Sistem Talimatları (Persona)</label>
           <textarea
             className="memory-textarea"
-            rows={5}
+            rows={4}
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
             placeholder="Asistanın rolünü, yanıt formatını ve kurallarını yaz…"
             required
           />
+
+          {/* Knowledge Base RAG Files */}
+          <label className="setting-label">Bilgi Bankası Dosyaları (PDF / TXT / MD)</label>
+          <div className="gem-kb-box">
+            <input
+              ref={docInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.txt,.md"
+              hidden
+              onChange={(e) => void handleDocUpload(e.target.files)}
+            />
+            <button
+              type="button"
+              className="gem-kb-upload-btn"
+              onClick={() => docInputRef.current?.click()}
+              disabled={uploading}
+            >
+              <FileUp size={15} />
+              <span>{uploading ? "Parçalanıp indeksleniyor…" : "Referans Dosya Ekle"}</span>
+            </button>
+
+            {docError && <p className="inline-warning" style={{ margin: "6px 0 0" }}>{docError}</p>}
+
+            {documents.length > 0 && (
+              <div className="gem-kb-list">
+                {documents.map((d) => (
+                  <div key={d.id} className="gem-kb-item">
+                    <FileText size={13} />
+                    <span>{d.name}</span>
+                    <small>
+                      {bytesLabel(d.size)} · {d.chunkCount} parça
+                    </small>
+                    <button
+                      type="button"
+                      onClick={() => void handleRemoveDoc(d.id)}
+                      title="Dosyayı kaldır"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <label className="setting-label">Varsayılan Model (İsteğe bağlı)</label>
           <select

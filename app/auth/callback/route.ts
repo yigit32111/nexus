@@ -1,17 +1,23 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 
-export async function GET(request: NextRequest) {
-  const url = new URL(request.url);
-  const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next");
-  const destination = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+export async function GET(request: Request) {
+  const { searchParams, origin } = new URL(request.url);
+  const code = searchParams.get("code");
+  const next = searchParams.get("next") ?? "/";
+
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "") ||
+    (forwardedHost ? `https://${forwardedHost}` : origin);
 
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(new URL(destination, url.origin));
+    if (!error) {
+      return NextResponse.redirect(`${appUrl}${next}`);
+    }
   }
 
-  return NextResponse.redirect(new URL("/login?auth=callback_error", url.origin));
+  return NextResponse.redirect(`${appUrl}/login?error=auth_callback_error`);
 }
