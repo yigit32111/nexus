@@ -4,6 +4,9 @@ import { useState } from "react";
 import { Check, Copy, PanelRightOpen } from "lucide-react";
 import { CanvasDoc } from "../types/nexus";
 import {InteractiveChart} from "./InteractiveChart";
+import {InteractiveCalculator} from "./InteractiveCalculator";
+import {ArtifactCard} from "./ArtifactCard";
+import {parseArtifact} from "../lib/workspace/cards";
 
 type RichTextProps = {
   text: string;
@@ -245,6 +248,8 @@ export function RichText({ text, onOpenCanvas }: RichTextProps) {
         if (i % 3 === 2) {
           const lang = blocks[i - 1] || "";
           if(lang==="nexus-chart")return <InteractiveChart key={i} raw={part}/>;
+          if(lang==="nexus-calculator")return <InteractiveCalculator key={i} raw={part}/>;
+          if(lang==="nexus-artifact"){const a=parseArtifact(part);if(a)return <ArtifactCard key={i+":"+a.title+":"+a.format} title={a.title} text={a.text} initialFormat={a.format}/>;}
           return <CodeBlock key={i} lang={lang} code={part} onOpenCanvas={onOpenCanvas} />;
         }
         if (i % 3 === 1) return null;

@@ -328,6 +328,7 @@ export default function Home() {
       if (!rows.length) return;
 
       const { error } = await supabase.from("nexus_chats").upsert(rows, { onConflict: "id" });
+      if(error)for(const row of rows)dirtyChatIdsRef.current.add(row.id);
       setSyncStatus(error ? "Sohbet yerel olarak kaydedildi" : "Tüm değişiklikler eşitlendi");
     }, 850);
     return () => window.clearTimeout(timer);
