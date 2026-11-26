@@ -20,7 +20,25 @@ export function runMiniCode(source:string){
   function add():number{let v=mul();while(ts[i]==="+"||ts[i]==="-"){const op=ts[i++],r=mul();v=op==="+"?v+r:v-r}return v}
   const v=add();if(i!==ts.length||!Number.isFinite(v)||Math.abs(v)>1e15)throw Error("Geçersiz sonuç");return v;
  }
- for(const line of lines){const s=line.trim();const pr=s.match(/^print\((.*)\)$/),assign=s.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/);if(pr)output.push(String(expr(pr[1])));else if(assign)vars.set(assign[1],expr(assign[2]));else output.push(String(expr(s)))}
+ let steps=0;
+ const indent=(s:string)=>s.match(/^ */)![0].length;
+ if(lines.some(l=>/^ *\t/.test(l)))throw Error("Girinti için boşluk kullan.");
+ function execute(start:number,end:number,level:number,depth:number){
+  if(depth>4)throw Error("Döngü derinliği aşıldı.");
+  for(let i=start;i<end;i++){
+   if(++steps>1000)throw Error("İşlem sınırı aşıldı.");
+   const line=lines[i],s=line.trim();if(indent(line)!==level)throw Error("Girinti hatası");
+   const loop=s.match(/^for ([A-Za-z_][A-Za-z0-9_]*) in range\((.+)\):$/);
+   if(loop){let j=i+1;while(j<end&&indent(lines[j])>level)j++;if(j===i+1)throw Error("Döngü gövdesi gerekli");
+    const n=expr(loop[2]);if(!Number.isSafeInteger(n)||n<0||n>100)throw Error("range: 0–100 tam sayı");
+    for(let k=0;k<n;k++){vars.set(loop[1],k);execute(i+1,j,indent(lines[i+1]),depth+1)}i=j-1;continue;
+   }
+   const pr=s.match(/^print\((.*)\)$/),assign=s.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/);
+   if(pr)output.push(String(expr(pr[1])));else if(assign)vars.set(assign[1],expr(assign[2]));else output.push(String(expr(s)));
+   if(output.length>500)throw Error("Çıktı sınırı aşıldı.");
+  }
+ }
+ execute(0,lines.length,0,0);
  return output.join("\n");
 }
 export type Bar={label:string;value:number};

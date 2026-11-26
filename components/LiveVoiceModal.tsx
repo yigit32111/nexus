@@ -176,7 +176,7 @@ export function LiveVoiceModal({ open, onClose, onSendVoiceMessage }: LiveVoiceM
         <p className="live-ai-caption">{aiResponse}</p>
       </div>
 
-      <div style={{display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap"}}><select aria-label="Konuşma dili" value={language} onChange={e=>setLanguage(e.target.value)}><option value="tr-TR">Türkçe</option><option value="en-US">English</option><option value="de-DE">Deutsch</option></select><label>Hız <input type="range" min=".7" max="1.4" step=".1" value={rate} onChange={e=>setRate(Number(e.target.value))}/></label><button type="button" onClick={()=>{stopAllAudio();if(!muted)startListening()}}>Yanıtı kes</button></div>
+      <div style={{display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap"}}><button type="button" disabled={status!=="listening"||muted} onClick={()=>{try{recognitionRef.current?.stop()}catch{/* ignore */}}}>Konuşmayı gönder</button><select aria-label="Konuşma dili" value={language} onChange={e=>setLanguage(e.target.value)}><option value="tr-TR">Türkçe</option><option value="en-US">English</option><option value="de-DE">Deutsch</option></select><label>Hız <input type="range" min=".7" max="1.4" step=".1" value={rate} onChange={e=>setRate(Number(e.target.value))}/></label><button type="button" onClick={()=>{stopAllAudio();if(!muted)startListening()}}>Yanıtı kes</button></div>
       <div className="live-voice-controls">
         <button
           type="button"
