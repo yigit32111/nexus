@@ -1,15 +1,38 @@
 export function words(text:string){return Array.from(new Set(text.toLocaleLowerCase("tr-TR").match(/[\p{L}\p{N}]{3,}/gu)||[])).slice(0,100)}
 const memoryStopWords = new Set(["bir", "için", "olan", "ile", "bunu", "bana", "çok", "daha", "şimdi", "what", "the", "and", "for", "this", "that", "you", "nasıl"]);
 
-export function relevantMemory(memory:string,query:string){
- const q=words(query).filter(word => !memoryStopWords.has(word));const lines=Array.from(new Set(memory.slice(0,24000).split("\n").map(x=>x.trim()).filter(Boolean)));
- return lines.map(text => {
-   const tokens = words(text);
-   const score = q.reduce((total, word) => total + (tokens.includes(word) ? 3 :
-     tokens.some(token => Math.min(token.length, word.length) >= 5 &&
-       (token.startsWith(word) || word.startsWith(token))) ? 1 : 0), 0);
-   return { text, score };
- }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,8).map(x=>x.text).join("\n").slice(0,3000);
+// Local bilingual concepts supplement literal matches without transmitting saved notes.
+const conceptGroups = [
+  ["yazılım", "software"], ["sınav", "imtihan", "exam"],
+  ["seyahat", "gezi", "travel"], ["renk", "color", "colour"],
+  ["kitap", "book"], ["yemek", "food"], ["müzik", "music"],
+  ["telefon", "phone"], ["bilgisayar", "computer"], ["doğumgünü", "birthday"],
+  ["tatil", "vacation"], ["araba", "otomobil", "car"],
+];
+const concepts = new Map(conceptGroups.flatMap(group =>
+  group.map(word => [word, group[0]] as const)
+));
+
+function memoryScore(query: string[], text: string) {
+  const tokens = words(text);
+  const meanings = new Set(tokens.map(token => concepts.get(token)).filter(Boolean));
+  let score = 0;
+  for (const word of query) {
+    if (tokens.includes(word)) score += 3;
+    else if (concepts.has(word) && meanings.has(concepts.get(word))) score += 2;
+    else if (tokens.some(token => Math.min(token.length, word.length) >= 5 &&
+      (token.startsWith(word) || word.startsWith(token)))) score++;
+  }
+  return score;
+}
+
+export function relevantMemory(memory: string, query: string) {
+  const terms = words(query).filter(word => !memoryStopWords.has(word));
+  if (!terms.length) return "";
+  const lines = new Set(memory.slice(0, 24000).split("\n").map(line => line.trim()).filter(Boolean));
+  return Array.from(lines, text => ({ text, score: memoryScore(terms, text) }))
+    .filter(item => item.score > 0).sort((a, b) => b.score - a.score)
+    .slice(0, 8).map(item => item.text).join("\n").slice(0, 3000);
 }
 export function summarizeHistory(messages:{role:string;content:string}[]){
  return messages.slice(-18).map(m=>m.role+": "+m.content.replace(/\s+/g," ").slice(0,180)).join("\n").slice(0,2200);
@@ -56,15 +79,14 @@ export function parseChart(raw:string):{title:string;bars:Bar[]}|null {
 
 export function recallChats(rows:unknown,query:string,currentId:string,projectId:string|null){
  if(!Array.isArray(rows))return "";
- const stop=new Set(["bir","için","olan","ile","bunu","bana","çok","daha","şimdi","what","the","and","for","this","that","you","nasıl"]);
- const q=words(query).filter(w=>!stop.has(w));if(!q.length)return "";
+ const q=words(query).filter(w=>!memoryStopWords.has(w));if(!q.length)return "";
  const candidates:{text:string;score:number}[]=[];
  for(const row of rows.slice(0,12)){
   if(!row||typeof row.id!=="string"||row.id===currentId||(row.project_id??null)!==projectId||!Array.isArray(row.messages))continue;
   for(const m of row.messages.slice(-24)){
    if(!m||m.role!=="user"||typeof m.content!=="string")continue;
-   const content=m.content.slice(0,4000).replace(/\s+/g," ").trim();const tokens=words(content);
-   const score=q.filter(w=>tokens.some(t=>t===w||(w.length>=5&&t.startsWith(w)))).length;
+   const content=m.content.slice(0,4000).replace(/\s+/g," ").trim();
+   const score=memoryScore(q,content);
    if(score>0)candidates.push({text:String(row.title||"Sohbet").slice(0,100)+": "+content.slice(0,500),score});
   }
  }

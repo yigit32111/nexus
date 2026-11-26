@@ -792,7 +792,7 @@ export default function Home() {
             <Sparkles size={24} />
           </div>
           <strong>
-            NEXUS<span>3.2</span>
+            NEXUS<span>4.0 Önizleme</span>
           </strong>
           <small>ÇALIŞMA ALANI HAZIRLANIYOR</small>
           <i />
@@ -1081,7 +1081,7 @@ export default function Home() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "nexus-3.2-yedek.json";
+            a.download = "nexus-4.0-yedek.json";
             a.click();
             URL.revokeObjectURL(url);
           }}

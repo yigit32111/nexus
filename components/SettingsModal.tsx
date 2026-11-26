@@ -106,7 +106,7 @@ export function SettingsModal({
       <section className="settings-dialog">
         <header className="settings-header">
           <div>
-            <div className="settings-eyebrow">NEXUS 3.3 AYARLAR</div>
+            <div className="settings-eyebrow">NEXUS 4.0 Önizleme AYARLAR</div>
             <h2>Ayarlar</h2>
             <p>Çalışma alanını, hafızanı ve kullanım istatistiklerini yönet.</p>
           </div>
@@ -656,7 +656,7 @@ export function SettingsModal({
                 </div>
 
                 {[
-                  ["Uygulama sürümü", "NEXUS AI 3.2 (RAG + Canvas 2.0 + Image + Live)"],
+                  ["Uygulama sürümü", "NEXUS AI 4.0 Önizleme"],
                   ["Hesap oturumu", "Aktif"],
                   ["Hafıza kayıtları", String(prefs.memoryItems.length)],
                   ["Özel Gem sayısı", String(prefs.gems.length)],

@@ -27,3 +27,8 @@ test("memory ranks exact matches above inflections and ignores filler words", ()
     "Veritabanı\nVeritabanında arama");
   assert.equal(relevantMemory("bana anlat", "bana"), "");
 });
+
+test("local concepts recall bilingual notes without depending on an outside provider", () => {
+  assert.equal(relevantMemory("Müzik dinlerim\nKitap okurum", "music"), "Müzik dinlerim");
+  assert.equal(relevantMemory("Sınav yarın\nİmtihan bugün", "imtihan"), "İmtihan bugün\nSınav yarın");
+});
