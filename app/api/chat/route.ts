@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { writeUsageLog } from "../../../utils/supabase/admin";
 import { estimateTokens } from "../../../lib/nexus-utils";
+import { routeModel } from "../../../lib/core/model-router";
+import { reserveRequest, reportedCost } from "../../../lib/core/budget";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -267,7 +269,7 @@ export async function POST(req: NextRequest) {
     }
     const model = requestedModel || process.env.AI_MODEL || "qwen/qwen3-vl-30b-a3b-instruct";
     const selectedSupportsVision =
-      body.modelSupportsVision === true || VISION_ID_RE.test(model);
+      body.modelSupportsVision === true || VISION_ID_RE.test(model) || model === "auto";
 
     if (imageParts.length && !selectedSupportsVision && !process.env.AI_VISION_MODEL) {
       return fail("Seçilen modelin görsel desteği doğrulanamadı. Görsel destekli bir model seç.");
@@ -288,21 +290,32 @@ export async function POST(req: NextRequest) {
     const isGroq = base.includes("groq.com");
     const isOpenRouter = base.includes("openrouter.ai");
 
-    if (useWebSearch && isOpenRouter && !effectiveModel.endsWith(":online")) {
-      effectiveModel = `${effectiveModel}:online`;
-    }
+    // Core routing uses server-verified provider metadata.
 
     const wantStream = body.stream !== false;
-    const promptTokensEst = estimateTokens(system + JSON.stringify(messages));
+    const textOnly=system+JSON.stringify(messages.map(m=>({role:m.role,content:Array.isArray(m.content)?m.content.filter(x=>x.type==="text"):m.content})));
+    const promptTokensEst = estimateTokens(textOnly);
+    let routed;
+    try {
+      routed=await routeModel({base,key,requested:requestedModel,defaultId:model==="auto"?(process.env.AI_MODEL||""):model,query:latestUserQuery,images:imageParts.length,inputTokens:Buffer.byteLength(textOnly)+imageParts.length*8192,web:useWebSearch});
+    } catch {
+      return fail("Model kataloğu veya uygun model bulunamadı. Otomatik ya da başka bir model seç.",503);
+    }
+    effectiveModel=routed.model.id;
+    if(useCodeExecution)return fail("Code Lab henüz etkin değil.",400);
+    if(!(await reserveRequest(user.id,"chat",routed.reserve)))return fail("Günlük kota doldu veya ücretli özellik kapalı.",429);
 
     const requestBody: Record<string, any> = {
       model: effectiveModel,
       messages: [{ role: "system", content: system }, ...messages],
       max_completion_tokens: 4096,
       stream: wantStream,
+      provider: {max_price:routed.maxPrice},
+      usage: {include:true},
+      ...(useWebSearch?{plugins:[{id:"web",max_results:3}]}:{}),
     };
 
-    if (body.modelSupportsTemperature !== false) {
+    if (routed.model.supported.includes("temperature")) {
       requestBody.temperature = temperature;
     }
 
@@ -364,6 +377,7 @@ export async function POST(req: NextRequest) {
           const reader = response.body!.getReader();
           let buffer = "";
           let fullReply = "";
+          let providerUsage:any;
 
           if (ragSources.length > 0) {
             const uniqueSources = Array.from(
@@ -393,6 +407,7 @@ export async function POST(req: NextRequest) {
 
                 try {
                   const parsed = JSON.parse(dataStr);
+                  if(parsed?.usage)providerUsage=parsed.usage;
                   const delta = parsed?.choices?.[0]?.delta;
                   const reasoningPiece =
                     typeof delta?.reasoning === "string"
@@ -444,7 +459,8 @@ export async function POST(req: NextRequest) {
               provider: isGroq ? "GROQ" : isOpenRouter ? "OPENROUTER" : "CUSTOM",
               feature: isLiveVoice ? "live" : ragSources.length ? "rag" : "chat",
               prompt_tokens: promptTokensEst,
-              completion_tokens: completionTokensEst,
+              completion_tokens: Number.isSafeInteger(providerUsage?.completion_tokens)&&providerUsage.completion_tokens>=0?providerUsage.completion_tokens:completionTokensEst,
+              cost_microusd:reportedCost(providerUsage),
             });
             controller.close();
           }
@@ -470,6 +486,7 @@ export async function POST(req: NextRequest) {
       feature: isLiveVoice ? "live" : ragSources.length ? "rag" : "chat",
       prompt_tokens: Number.isSafeInteger(payload?.usage?.prompt_tokens) && payload.usage.prompt_tokens >= 0 ? payload.usage.prompt_tokens : promptTokensEst,
       completion_tokens: Number.isSafeInteger(payload?.usage?.completion_tokens) && payload.usage.completion_tokens >= 0 ? payload.usage.completion_tokens : estimateTokens(reply),
+      cost_microusd:reportedCost(payload?.usage),
     });
     return NextResponse.json({
       reply,

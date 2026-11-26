@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { writeUsageLog } from "../../../utils/supabase/admin";
+import { reserveRequest } from "../../../lib/core/budget";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
     let lastError = "";
 
     for (const modelId of HF_IMAGE_MODELS) {
+      if(!(await reserveRequest(user.id,"image",0)))return NextResponse.json({error:"Günlük görsel veya istek kotası doldu."},{status:429});
       const hfRes = await fetch(
         `https://router.huggingface.co/hf-inference/models/${modelId}`,
         {

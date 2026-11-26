@@ -1,12 +1,13 @@
 {
   "name": "nexus-ai-3",
-  "version": "3.2.1",
+  "version": "3.3.0-alpha.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --experimental-strip-types --test tests/model-policy.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
