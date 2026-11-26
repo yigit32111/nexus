@@ -75,6 +75,8 @@ export default function Home() {
   const [provider, setProvider] = useState("AI SAĞLAYICISI");
   const [configured, setConfigured] = useState(false);
   const [adminAccountId, setAdminAccountId] = useState("");
+  const [projects, setProjects] = useState<{id:string;name:string}[]>([]);
+  const [projectFilter, setProjectFilter] = useState("");
 
   const [files, setFiles] = useState<UploadAttachment[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -110,11 +112,11 @@ export default function Home() {
       chats
         .filter(
           (c) =>
-            Boolean(c.archived) === archiveView &&
+            Boolean(c.archived) === archiveView && (!projectFilter || c.projectId === projectFilter) &&
             c.title.toLocaleLowerCase("tr-TR").includes(search.toLocaleLowerCase("tr-TR"))
         )
         .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || b.updatedAt - a.updatedAt),
-    [chats, archiveView, search]
+    [chats, archiveView, search, projectFilter]
   );
 
   const approvedMemory = useMemo(
@@ -153,7 +155,7 @@ export default function Home() {
 
       const cloudChatResult = await supabase
         .from("nexus_chats")
-        .select("id,title,messages,updated_at,pinned,archived")
+        .select("id,title,messages,updated_at,pinned,archived,project_id")
         .eq("user_id", id)
         .order("updated_at", { ascending: false });
       if (cancelled) return;
@@ -171,6 +173,7 @@ export default function Home() {
             pinned: Boolean(c.pinned),
             archived: Boolean(c.archived),
             gemId: typeof c.gemId === "string" ? c.gemId : undefined,
+            projectId: typeof c.projectId === "string" ? c.projectId : undefined,
           }));
         }
       } catch {
@@ -188,6 +191,7 @@ export default function Home() {
           pinned: Boolean(r.pinned),
           archived: Boolean(r.archived),
           gemId: localGemMap.get(String(r.id)),
+          projectId: typeof r.project_id==="string"?r.project_id:undefined,
         }));
         setSyncStatus("Buluttan yüklendi");
       } else if (localChats.length) {
@@ -210,6 +214,9 @@ export default function Home() {
         savedPrefs = {};
       }
 
+      const projectResult = await supabase.from("nexus_projects").select("id,name").eq("user_id",id).order("created_at",{ascending:false}).limit(100);
+      if(cancelled)return;
+      if(!projectResult.error)setProjects(projectResult.data||[]);
       const cloudPrefsResult = await supabase
         .from("nexus_user_settings")
         .select("prefs")
@@ -313,6 +320,7 @@ export default function Home() {
           messages: c.messages,
           pinned: Boolean(c.pinned),
           archived: Boolean(c.archived),
+          project_id: c.projectId || null,
           updated_at: new Date(c.updatedAt || Date.now()).toISOString(),
         }));
 
@@ -591,6 +599,7 @@ export default function Home() {
           stream: true,
           messages: outgoing.map((m) => ({ role: m.role, content: m.content })),
           memory: approvedMemory.map((m) => `• [${m.category}] ${m.text}`).join("\n"),
+          projectId: activeChat.projectId,
           model: effectiveModelId || undefined,
           modelSupportsVision:
             selectedModel?.vision === true || VISION_ID_RE.test(effectiveModelId),
@@ -918,6 +927,11 @@ export default function Home() {
             }}
           />
 
+          <div style={{display:"flex",gap:8,alignItems:"center",padding:"5px 12px",flexWrap:"wrap",fontSize:11}}>
+            <button type="button" onClick={()=>router.push("/workspace")}>▣ Çalışma alanı</button>
+            <select aria-label="Sohbet proje filtresi" value={projectFilter} onChange={e=>setProjectFilter(e.target.value)}><option value="">Tüm sohbetler</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>
+            {activeChat&&<select aria-label="Aktif sohbetin projesi" disabled={busy} value={activeChat.projectId||""} onChange={e=>{const projectId=e.target.value;updateChat(activeChat.id,c=>({...c,projectId:projectId||undefined,updatedAt:Date.now()}))}}><option value="">Projeye bağla</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>}
+          </div>
           <MessageList
             activeChat={activeChat}
             activeGem={activeGem}

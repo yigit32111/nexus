@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Copy, PanelRightOpen } from "lucide-react";
 import { CanvasDoc } from "../types/nexus";
+import {InteractiveChart} from "./InteractiveChart";
 
 type RichTextProps = {
   text: string;
@@ -243,6 +244,7 @@ export function RichText({ text, onOpenCanvas }: RichTextProps) {
       {blocks.map((part, i) => {
         if (i % 3 === 2) {
           const lang = blocks[i - 1] || "";
+          if(lang==="nexus-chart")return <InteractiveChart key={i} raw={part}/>;
           return <CodeBlock key={i} lang={lang} code={part} onOpenCanvas={onOpenCanvas} />;
         }
         if (i % 3 === 1) return null;

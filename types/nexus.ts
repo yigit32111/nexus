@@ -32,6 +32,7 @@ export type Chat = {
   pinned?: boolean;
   archived?: boolean;
   gemId?: string;
+  projectId?: string;
 };
 
 export type MemoryCategory = "Profil" | "Tercih" | "Hedef" | "Proje" | "Diğer";
