@@ -180,6 +180,17 @@ try {
   }
   assert.equal(prompts.length,beforeOwner);
   console.log("OK owner Pro preview: both model placeholders disabled, no chat request");
+  chats.push({
+    id: "phone-chat", user_id: user.id, title: "Telefonda açıldı",
+    archived: false, updated_at: new Date().toISOString(),
+    messages: [{ id: "phone-message", role: "user", content: "Cihazlar arası örnek", createdAt: 1 }],
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  const syncedChat = page.locator(".chat-select").filter({ hasText: "Telefonda açıldı" });
+  await syncedChat.waitFor();
+  assert.equal(await page.getByText("foreign-chat-marker", { exact: true }).count(), 0);
+  await page.keyboard.press("Escape");
+  console.log("OK a new chat from the same account appears without reloading");
   await page.evaluate(() => {
     const channel = new BroadcastChannel("sb-example-auth-token");
     channel.postMessage({ event: "SIGNED_OUT", session: null });

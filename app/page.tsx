@@ -42,6 +42,31 @@ import { LiveVoiceModal } from "../components/LiveVoiceModal";
 import { NexusSplash } from "../components/NexusBrand";
 
 const CHAT_KEY = "nexus_chats_v3";
+const CHAT_CLOUD_FIELDS = "id,user_id,title,messages,updated_at,pinned,archived,project_id";
+
+type CloudChat = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  messages: unknown;
+  updated_at: string | null;
+  pinned: boolean;
+  archived: boolean;
+  project_id: string | null;
+};
+
+function readCloudChat(row: CloudChat, gemId?: string): Chat {
+  return {
+    id: row.id,
+    title: row.title || "Yeni sohbet",
+    messages: safeMessageList(row.messages),
+    updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : 0,
+    pinned: Boolean(row.pinned),
+    archived: Boolean(row.archived),
+    gemId,
+    projectId: row.project_id ?? undefined,
+  };
+}
 const PREF_KEY = "nexus_prefs_v3";
 
 export default function Home() {
@@ -100,6 +125,7 @@ export default function Home() {
   const abortRef = useRef<AbortController | null>(null);
   const recognitionRef = useRef<any>(null);
   const chatWrites = useRef(Promise.resolve());
+  const pendingCloudWrites = useRef(0);
   const removedIds = useRef(new Set<string>());
   const dirtyChatIdsRef = useRef<Set<string>>(new Set());
 
@@ -171,7 +197,7 @@ export default function Home() {
 
       const cloudChatResult = await supabase
         .from("nexus_chats")
-        .select("id,user_id,title,messages,updated_at,pinned,archived,project_id")
+        .select(CHAT_CLOUD_FIELDS)
         .eq("user_id", id)
         .order("updated_at", { ascending: false });
       if (cancelled) return;
@@ -199,16 +225,8 @@ export default function Home() {
       let loadedChats: Chat[] = [];
       if (!cloudChatResult.error && Array.isArray(cloudChatResult.data) && cloudChatResult.data.length) {
         const localGemMap = new Map(localChats.map((lc) => [lc.id, lc.gemId]));
-        loadedChats = cloudChatResult.data.filter(row => row.user_id === id).map((r: any) => ({
-          id: String(r.id),
-          title: String(r.title || "Yeni sohbet"),
-          messages: safeMessageList(r.messages),
-          updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : Date.now(),
-          pinned: Boolean(r.pinned),
-          archived: Boolean(r.archived),
-          gemId: localGemMap.get(String(r.id)),
-          projectId: typeof r.project_id==="string"?r.project_id:undefined,
-        }));
+        loadedChats = cloudChatResult.data.filter(row => row.user_id === id)
+          .map(row => readCloudChat(row, localGemMap.get(row.id)));
         setSyncStatus("Buluttan yüklendi");
       } else if (cloudChatResult.error && localChats.length) {
         loadedChats = localChats;
@@ -340,16 +358,64 @@ export default function Home() {
       dirtyChatIdsRef.current.clear();
       if (!rows.length) return;
 
+      pendingCloudWrites.current++;
       chatWrites.current = chatWrites.current.then(async () => {
       const liveRows = rows.filter(row => !removedIds.current.has(row.id));
       if (!liveRows.length) return;
       const { error } = await supabase.from("nexus_chats").upsert(liveRows, { onConflict: "id" });
       if(error)for(const row of rows)dirtyChatIdsRef.current.add(row.id);
       setSyncStatus(error ? "Sohbet yerel olarak kaydedildi" : "Tüm değişiklikler eşitlendi");
-      }).catch(() => setSyncStatus("Bulut kaydı başarısız"));
+      }).catch(() => {
+        for (const row of rows) dirtyChatIdsRef.current.add(row.id);
+        setSyncStatus("Bulut kaydı başarısız");
+      }).finally(() => { pendingCloudWrites.current--; });
     }, 850);
     return () => window.clearTimeout(timer);
   }, [chats, userId, loading, busy, supabase]);
+
+  useEffect(() => {
+    if (!userId || loading || busy) return;
+    const controller = new AbortController();
+    let refreshing = false;
+
+    async function refreshChats() {
+      if (document.visibilityState !== "visible" || refreshing || pendingCloudWrites.current) return;
+      refreshing = true;
+      try {
+        const { data, error } = await supabase.from("nexus_chats")
+          .select(CHAT_CLOUD_FIELDS).eq("user_id", userId)
+          .order("updated_at", { ascending: false })
+          .abortSignal(controller.signal);
+        if (error || !data || controller.signal.aborted || pendingCloudWrites.current) return;
+        setChats((current) => {
+          const merged = new Map(current.map((chat) => [chat.id, chat]));
+          let changed = false;
+          for (const row of data) {
+            if (row.user_id !== userId || removedIds.current.has(row.id) || dirtyChatIdsRef.current.has(row.id)) continue;
+            const local = merged.get(row.id);
+            const remote = readCloudChat(row, local?.gemId);
+            if (local && remote.updatedAt <= local.updatedAt) continue;
+            merged.set(row.id, remote);
+            changed = true;
+          }
+          return changed ? [...merged.values()].sort((a, b) => b.updatedAt - a.updatedAt) : current;
+        });
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    const refresh = () => { void refreshChats().catch(() => {}); };
+    const interval = window.setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [userId, loading, busy, supabase]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
