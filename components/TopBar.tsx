@@ -52,6 +52,13 @@ export function TopBar({
   const [filter, setFilter] = useState<"all" | "free" | "vision">("all");
   const [query, setQuery] = useState("");
   const popRef = useRef<HTMLDivElement>(null);
+  const modelButtonRef = useRef<HTMLButtonElement>(null);
+
+  function chooseModel(modelId: string) {
+    onSelectModel(modelId);
+    setDropdownOpen(false);
+    modelButtonRef.current?.focus();
+  }
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -96,12 +103,25 @@ export function TopBar({
 
       <div className="topbar-right">
         {/* Searchable Model Switcher Popover */}
-        <div className="model-switcher-wrap" ref={popRef}>
+        <div
+          className="model-switcher-wrap"
+          ref={popRef}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape" || !dropdownOpen) return;
+            event.stopPropagation();
+            setDropdownOpen(false);
+            modelButtonRef.current?.focus();
+          }}
+        >
           <button
+            ref={modelButtonRef}
             type="button"
             className="model-switcher-btn"
             onClick={() => setDropdownOpen((v) => !v)}
             title="Model seç"
+            aria-label={`Model seç: ${displayModelName}`}
+            aria-expanded={dropdownOpen}
+            aria-controls={dropdownOpen ? "nexus-model-picker" : undefined}
           >
             <Zap size={13} />
             <span>{displayModelName}</span>
@@ -109,12 +129,13 @@ export function TopBar({
           </button>
 
           {dropdownOpen && (
-            <div className="model-popover">
+            <div className="model-popover" id="nexus-model-picker">
               <div className="model-popover-search">
                 <Search size={14} />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
+                  aria-label="Model ara"
                   placeholder="Model ara (ör. gemini, qwen, llama)…"
                   autoFocus
                 />
@@ -148,10 +169,7 @@ export function TopBar({
                 <button
                   type="button"
                   className={`model-option ${selectedModelId === "" ? "selected" : ""}`}
-                  onClick={() => {
-                    onSelectModel("");
-                    setDropdownOpen(false);
-                  }}
+                  onClick={() => chooseModel("")}
                 >
                   <div>
                     <b>NEXUS Auto (varsayılan)</b>
@@ -160,16 +178,13 @@ export function TopBar({
                   {selectedModelId === "" && <Check size={14} />}
                 </button>
 
-                <button type="button" className={`model-option ${selectedModelId==="auto"?"selected":""}`} onClick={()=>{onSelectModel("auto");setDropdownOpen(false);}}><div><b>NEXUS Auto</b><small>Ücretsiz uygun modeli sunucu seçer</small></div>{selectedModelId==="auto"&&<Check size={14}/>}</button>
+                <button type="button" className={`model-option ${selectedModelId==="auto"?"selected":""}`} onClick={() => chooseModel("auto")}><div><b>NEXUS Auto</b><small>Ücretsiz uygun modeli sunucu seçer</small></div>{selectedModelId==="auto"&&<Check size={14}/>}</button>
                 {filteredModels.map((m) => (
                   <button
                     key={m.id}
                     type="button"
                     className={`model-option ${selectedModelId === m.id ? "selected" : ""}`}
-                    onClick={() => {
-                      onSelectModel(m.id);
-                      setDropdownOpen(false);
-                    }}
+                    onClick={() => chooseModel(m.id)}
                   >
                     <div>
                       <b>{m.name}</b>

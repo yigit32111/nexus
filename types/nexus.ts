@@ -191,6 +191,6 @@ export const INTRO_MESSAGE: Message = {
   id: "intro",
   role: "assistant",
   content:
-    "Merhaba, ben NEXUS 5.0 RC1. Soru sorabilir, Gem bilgi bankana doküman yükleyebilir, Canvas 2.0 ile canlı React uygulamaları çalıştırabilir, yüklediğin görselleri analiz edebilir veya NEXUS Live ile sesli sohbet edebilirsin.",
+    "Merhaba, ben NEXUS 5.1. Soru sorabilir, Gem bilgi bankana doküman yükleyebilir, Canvas 2.0 ile canlı React uygulamaları çalıştırabilir, yüklediğin görselleri analiz edebilir veya NEXUS Live ile sesli sohbet edebilirsin.",
   createdAt: Date.now(),
 };

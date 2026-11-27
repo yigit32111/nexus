@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) {
-      console.error("NEXUS SHARE ERROR", error);
+      console.error("NEXUS SHARE ERROR", error.code);
       return NextResponse.json(
         { error: "Paylaşım kaydedilemedi. nexus_shares tablosunun oluşturulduğundan emin ol." },
         { status: 500 }
