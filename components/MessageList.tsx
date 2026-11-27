@@ -19,6 +19,7 @@ import { CanvasDoc, Chat, Gem, INTRO_MESSAGE, Message } from "../types/nexus";
 import { extractThinkingTags } from "../lib/nexus-utils";
 import { RichText } from "./RichText";
 import { ThinkingAccordion } from "./ThinkingAccordion";
+import { NexusLogo } from "./NexusBrand";
 import { renderGemIcon } from "./Sidebar";
 
 type MessageListProps = {
@@ -79,13 +80,9 @@ export function MessageList({
             </div>
           ) : (
             <>
-              <h1>
-                Merhaba, <em>nasıl yardımcı olayım?</em>
-              </h1>
-              <p>
-                Sorularını sor, Gem bilgi bankana doküman yükle, görsel üret veya Canvas 2.0 ile
-                canlı React bileşenleri çalıştır.
-              </p>
+              <div className="nexus-welcome-logo"><NexusLogo size={76} /></div>
+              <h1>Merhaba! Bugün ne üzerinde çalışalım?</h1>
+              <p>Bir fikrin, bir sorun ya da öğrenmek istediğin bir konu varsa buradan başlayabiliriz.</p>
             </>
           )}
 
@@ -119,13 +116,13 @@ export function MessageList({
             <button
               type="button"
               onClick={() =>
-                onSelectStarterPrompt("/ciz Geleceğin fütüristik İstanbul boğazı, sinematik ışık")
+                onSelectStarterPrompt("Bir fikri geliştirmek istiyorum. Bana birkaç yaratıcı başlangıç öner.")
               }
             >
               <Sparkles size={17} />
               <span>
-                <b>Görsel üret</b>
-                <small>Metinden yüksek çözünürlüklü görsel çiz</small>
+                <b>Fikir geliştir</b>
+                <small>Yaratıcı seçenekleri keşfet</small>
               </span>
             </button>
             <button type="button" onClick={onTriggerFileUpload}>
@@ -160,7 +157,7 @@ export function MessageList({
                 }`}
               >
                 {message.role === "assistant" ? (
-                  <Sparkles size={16} />
+                  <NexusLogo size={26} decorative />
                 ) : (
                   email.charAt(0).toUpperCase() || "Y"
                 )}

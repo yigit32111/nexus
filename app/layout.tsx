@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   applicationName: "NEXUS AI 5.0 RC1",
   appleWebApp: { capable: true, title: "NEXUS 5.0 RC1", statusBarStyle: "black-translucent" },
   manifest: "/manifest.webmanifest",
+  icons: { icon: "/icon.svg" },
 };
 
 export const viewport: Viewport = {

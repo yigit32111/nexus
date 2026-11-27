@@ -9,6 +9,12 @@ for(const mode of modes){
   await page.goto(base+"/login",{waitUntil:"domcontentloaded"});
   const email=page.locator('input[type="email"]');const pass=page.locator('input[type="password"]');
   await email.waitFor({state:"visible"});await pass.waitFor({state:"visible"});
+  const logo=page.getByRole("img",{name:"NEXUS logosu",exact:true});
+  await logo.waitFor({state:"visible"});
+  assert.equal(await logo.getAttribute("src"),"/icon.svg");
+  await page.waitForFunction(()=>Array.from(document.images).some(i=>i.alt==="NEXUS logosu"&&i.complete&&i.naturalWidth>0));
+  await page.getByRole("heading",{name:"Tekrar hoş geldin.",exact:true}).waitFor();
+  console.log("OK branded welcome",mode.name);
   assert.equal(await email.isVisible(),true);assert.equal(await pass.isVisible(),true);
   await email.fill("mobile-test@example.invalid");await pass.fill("test-only-no-submit");
   const size=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,width:window.innerWidth,input:parseFloat(getComputedStyle(document.querySelector('input[type="email"]')).fontSize)}));

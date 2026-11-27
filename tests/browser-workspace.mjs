@@ -67,7 +67,20 @@ try {
     json: route.request().method() === "GET" ? chats : [],
   }));
   await page.route(base + "/api/status", route => route.fulfill({json:{model:"auto",provider:"OPENROUTER",configured:true,accountId:user.id,plan:"free",premiumEnabled:false}}));
+  let releaseStatus;
+  const statusGate=new Promise(resolve=>{releaseStatus=resolve});
+  await page.unroute(base + "/api/status");
+  await page.route(base + "/api/status",async route=>{
+    await statusGate;
+    await route.fulfill({json:{model:"auto",provider:"OPENROUTER",configured:true,accountId:user.id,plan:"free",premiumEnabled:false}});
+  });
   await page.goto(base + "/");
+  try {
+    await page.locator(".nexus-splash img").waitFor({state:"visible"});
+    await page.getByText("5.0 RC1",{exact:true}).waitFor();
+    assert.equal(await page.locator(".nexus-splash img").getAttribute("src"),"/icon.svg");
+    console.log("OK branded loading state");
+  } finally { releaseStatus(); }
   await page.getByText("fixture-visible", {exact:true}).waitFor();
   assert.equal(await page.getByTitle("Görsel üretim modunu aç/kapat").count(),0);
   assert.ok(await page.locator('input[type="file"]').count()>0);
@@ -77,6 +90,11 @@ try {
   await page.getByText("fixture-visible", {exact:true}).waitFor({state:"detached"});
   assert.equal(await page.getByText("fixture-archived",{exact:true}).count(),0);
   await page.locator(".chat-select").filter({hasText:"Yeni sohbet"}).waitFor();
+  await page.getByRole("heading",{name:"Merhaba! Bugün ne üzerinde çalışalım?",exact:true}).waitFor();
+  await page.locator(".nexus-welcome-logo img").waitFor({state:"visible"});
+  assert.equal(await page.getByRole("button",{name:/Görsel üret/}).count(),0);
+  await page.getByRole("button",{name:/Fikir geliştir/}).waitFor();
+  console.log("OK warm new-chat welcome and supported starters");
   await page.evaluate(() => {
     window.SpeechRecognition=class {
       start(){ window.testRecognizer=this;this.onstart?.(); }
