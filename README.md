@@ -1,12 +1,12 @@
-# NEXUS AI 5.0 RC1
+# NEXUS AI 5.1
 
-NEXUS, Türkçe sohbet, kaynaklı araştırma, belge üretimi ve sesli konuşmayı aynı hesapta bir araya getiren bir yapay zekâ çalışma alanıdır. Bu geliştirme dalı **5.0.0-rc.1** sürümünü içerir; canlı yayın 4.0.0 olarak korunmaktadır. Destek kapsamı ve doğrulama koşulları için [5.0 RC1 yayın notlarına](docs/5.0-rc1.md) bak. [NEXUS’u aç](https://nexus-ifn5.onrender.com) · [5.0 geliştirme dalı](https://github.com/yigit32111/nexus/pull/11)
+NEXUS, Türkçe sohbet, kaynaklı araştırma, belge üretimi ve sesli konuşmayı aynı hesapta bir araya getiren bir yapay zekâ çalışma alanıdır. Bu depo **5.1.0** sürümünün kaynak kodunu içerir. [Smart Context](docs/5.1-smart-context.md) · [Cost Intelligence](docs/5.1-cost-intelligence.md)
 
 ## Nereden başlanır?
 
 Hesabınla giriş yapıp **Yeni sohbet** aç. Model menüsünden **NEXUS Auto**’yu seçebilir, ataçla dosya ekleyebilir veya mikrofonla yazdırabilirsin. Üstteki **Çalışma alanı** düğmesi projeleri, araştırmayı, Code Lab’i, dosya araçlarını, Multi-AI’ı ve Agent Mode’u açar.
 
-[NEXUS 4.0 uygulamasını aç](https://nexus-ifn5.onrender.com)
+[NEXUS uygulamasını aç](https://nexus-ifn5.onrender.com)
 
 ## Sohbet ve model seçimi
 
@@ -17,8 +17,8 @@ Hesabınla giriş yapıp **Yeni sohbet** aç. Model menüsünden **NEXUS Auto**�
 | Multi-AI | Aynı soruya iki farklı ücretsiz modelden sırayla yanıt alırsın. İstersen üçüncü çağrıyla ortak noktaları ve farklılıkları özetletir, sonucu düzenlemek için dosya alanına aktarırsın. İki uygun modelin kullanılabilir olması gerekir. |
 | Agent Mode | Yazı konusu için önce bir plan hazırlar. Planı inceledikten sonra ikinci aşamayı sen başlatırsın. Çıktı düzenlenebilir bir yazı taslağıdır. |
 | Yanıt araçları | Akış hâlinde yanıt, Markdown ve kod blokları, kopyalama, mesaj düzenleme, yeniden üretme, daha kısa veya ayrıntılı yanıt isteme ve sesli okuma. Sağlayıcı desteklediğinde düşünme içeriği ayrı açılabilir. |
-| Dosya ve görsel | PDF ve TXT içeriğini sohbete ekleyebilir, PNG, JPG veya WebP görsellerini yükleyebilir ya da yapıştırabilirsin. Görsel analizi uyumlu model gerektirir. 5.0 geliştirme dalında görsel üretimi kaldırıldı; eski görsel mesajları korunur. |
-| Web araması | Ücretli arama eklentisi 5.0'da kapalı; ücretsiz araştırma çalışma alanından kullanılabilir. |
+| Dosya ve görsel | PDF ve TXT içeriğini sohbete ekleyebilir, PNG, JPG veya WebP görsellerini yükleyebilir ya da yapıştırabilirsin. Görsel analizi uyumlu model gerektirir. Eski görsel mesajlarına sohbet geçmişinden erişebilirsin. |
+| Web araması | Ücretsiz kaynaklı araştırmayı çalışma alanından açabilirsin. |
 
 ## Projeler, Gems ve Memory 3.0
 
@@ -26,6 +26,7 @@ Hesabınla giriş yapıp **Yeni sohbet** aç. Model menüsünden **NEXUS Auto**�
 - **Projeler** konuşmaları konuya göre gruplar. Bir projeye talimat, referans notu ve metin dosyası ekleyebilir, sohbeti projeye bağlayabilir ve geçmişi projeye göre filtreleyebilirsin.
 - **Gems** belirli bir görev için talimatları olan asistanlardır. Hazır asistanları kullanabilir veya kendi Gem’ini oluşturabilirsin. Bilgi bankasına eklediğin belgelerden soruyla ilgili parçalar seçilir ve kaynak dosyalar yanıtta gösterilebilir.
 - **Memory 3.0** elle eklenen notları ve onayladığın hafıza önerilerini kullanır. Kayıtları kategorilere ayırabilir, düzenleyebilir ve silebilirsin. Arama sözcükleri, sözcük biçimlerini ve sınırlı bir Türkçe–İngilizce kavram listesini eşleştirir. İsteğe bağlı geçmiş hatırlama, aynı proje kapsamındaki önceki kullanıcı mesajlarını tarar.
+- **Smart Context** uzun sohbetlerde en yeni mesajları korur ve önceki ilgili mesajlardan kısa alıntılar seçer. Ayarlardan kapatılabilir.
 - **Hesap ve tercihler** e-posta/parola ile giriş, parola sıfırlama, kullanıcıya özel bulut eşitlemesi ve yerel yedek içerir. Ayarlardan tema, üslup, ton, model ve yaratıcılık düzeyi değiştirilebilir. Sohbet ve ayarlar JSON olarak yedeklenip geri alınabilir. Açık sohbet Markdown olarak indirilebilir.
 
 ## Araştırma, kod ve dosyalar
@@ -44,7 +45,7 @@ Hesabınla giriş yapıp **Yeni sohbet** aç. Model menüsünden **NEXUS Auto**�
 
 Ses tanıma tarayıcı desteğine, mikrofon iznine ve cihazın konuşma servisine bağlıdır. Doğrudan tanıma sunmayan tarayıcılarda klavyenin dikte özelliği kullanılabilir. Mobil arayüz ve PWA manifesti ana ekrandan erişimi destekler. Sohbet ve bulut eşitlemesi internet bağlantısı gerektirir.
 
-## Admin Center 2.0
+## Admin Center 3.0
 
 Yönetici hesabı `/admin` sayfasında şu göstergeleri görür:
 
@@ -52,6 +53,7 @@ Yönetici hesabı `/admin` sayfasında şu göstergeleri görür:
 - **Free ve Pro hesaplar** sunucunun yönettiği hesap bilgilerinden sayılır. `app_metadata.plan` değeri `pro` olan hesaplar Pro grubundadır.
 - **Toplam token** tüm kullanıcıların kayıtlı giriş ve çıkış tokenlarının toplamıdır. Bazı kullanım değerleri tahminidir.
 - **Günlük kotalar** UTC gününe göre istekler, görsel denemeleri, kullanım kayıtları, ayrılan bütçe ve kullanıcı başına sınırları gösterir. Yönetim ekranı salt okunurdur.
+- **Cost Intelligence önizlemesi** son yedi UTC gününün token kullanımını ve modele göre kullanım dökümünü gösterir. Maliyeti bilinmeyen kayıtlar ayrıca işaretlenir.
 
 ## Yerel çalıştırma
 
@@ -75,7 +77,7 @@ Tarayıcıda `http://localhost:3000` adresini aç. Üretim için önce `npm run 
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Tarayıcı için yayımlanabilir anahtar. Eski projelerde `NEXT_PUBLIC_SUPABASE_ANON_KEY` kullanılabilir. |
 | `SUPABASE_SECRET_KEY` | Sunucuda kota, kullanım ve yetkili veri işlemleri. Eski anahtar için `SUPABASE_SERVICE_ROLE_KEY` desteklenir. |
 | `AI_API_KEY` | OpenRouter sunucu anahtarı |
-| `AI_BASE_URL`, `AI_MODEL` | İsteğe bağlı sağlayıcı adresi ve varsayılan model. 5.0 yalnızca doğrulanmış ücretsiz OpenRouter modellerini kullanır; AI_MODEL, Auto için ikincil öncelik ipucudur. Varsayılan adres `https://openrouter.ai/api/v1` değeridir. |
+| `AI_BASE_URL`, `AI_MODEL` | İsteğe bağlı sağlayıcı adresi ve varsayılan model. NEXUS 5.1 doğrulanmış ücretsiz OpenRouter modellerini kullanır. AI_MODEL, Auto için ikincil öncelik ipucudur. Varsayılan adres `https://openrouter.ai/api/v1` değeridir. |
 | `NEXUS_ADMIN_USER_ID` | Yönetim paneline erişecek Supabase kullanıcısının UUID değeri |
 | `NEXT_PUBLIC_APP_URL` | Paylaşım bağlantıları için uygulamanın dışarıdan erişilen adresi |
 
@@ -85,6 +87,7 @@ Sunucu anahtarlarını yalnız sunucu ortamında tut. Kullanıcı verilerine eri
 
 ```sh
 npm test
+npm run lint
 npm run build
 npm audit --omit=dev --audit-level=moderate
 ```

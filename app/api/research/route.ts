@@ -15,13 +15,13 @@ export async function POST(req:NextRequest){
   if(!await reserveRequest(user.id,"chat",0))return NextResponse.json({error:"Günlük kota doldu"},{status:429});
   const wikiTasks=(academicOnly ? [] : ["tr","en"]).map(async lang=>{
    const params=new URLSearchParams({action:"query",generator:"search",gsrsearch:q,gsrlimit:"4",prop:"extracts",exintro:"1",explaintext:"1",exchars:"1000",format:"json",formatversion:"2"});
-   const response=await fetch("https://"+lang+".wikipedia.org/w/api.php?"+params,{headers:{"User-Agent":"NEXUS/4.0 (https://nexus-ifn5.onrender.com)"},signal,cache:"no-store",redirect:"error"});
+   const response=await fetch("https://"+lang+".wikipedia.org/w/api.php?"+params,{headers:{"User-Agent":"NEXUS/5.1 (https://nexus-ifn5.onrender.com)"},signal,cache:"no-store",redirect:"error"});
    if(!response.ok)throw Error("research source failed");const data=await response.json();
    return (Array.isArray(data?.query?.pages)?data.query.pages:[]).filter((r:any)=>Number.isSafeInteger(r.pageid)&&typeof r.title==="string"&&typeof r.extract==="string"&&r.extract.trim()).map((r:any)=>({title:r.title.slice(0,180),text:r.extract.slice(0,1000),url:"https://"+lang+".wikipedia.org/?curid="+r.pageid,lang}));
   });
   const crossrefTask=async()=>{
     const params=new URLSearchParams({"query.bibliographic":q,rows:"5",select:"DOI,title,container-title,published,author"});
-    const r=await fetch("https://api.crossref.org/works?"+params,{headers:{"User-Agent":"NEXUS/4.0 (https://nexus-ifn5.onrender.com)"},cache:"no-store",signal,redirect:"error"});
+    const r=await fetch("https://api.crossref.org/works?"+params,{headers:{"User-Agent":"NEXUS/5.1 (https://nexus-ifn5.onrender.com)"},cache:"no-store",signal,redirect:"error"});
     if(!r.ok)throw Error("Crossref unavailable");
     const data=await r.json();const items=Array.isArray(data?.message?.items)?data.message.items:[];
     return items.filter((x:any)=>typeof x?.DOI==="string"&&/^10\.\d{4,9}\/[^\s]{1,220}$/.test(x.DOI)&&typeof x?.title?.[0]==="string").map((x:any)=>({

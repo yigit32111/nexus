@@ -11,7 +11,7 @@ export default function PlansPage(){
   <div className="plans-inner">
    <header className="plans-top"><Link href="/" className="plans-brand">NEXUS<span>AI</span></Link><Link href="/">Sohbete dön</Link></header>
    <section className="plans-hero">
-    <p className="plans-kicker">NEXUS 5.0 · ÖNİZLEME</p>
+    <p className="plans-kicker">NEXUS 5.1 · ÖNİZLEME</p>
     <h1>Üyelik planları</h1>
     <p>İhtiyaçlarına uygun yapay zekâ deneyimini keşfet.</p>
     <div className="plans-notice" role="note">Bu sayfa tasarım önizlemesidir. NEXUS 10.0'a kadar gerçek ödeme alınmayacak; premium erişim kapalıdır.</div>

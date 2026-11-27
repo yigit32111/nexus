@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync, existsSync} from "node:fs";
 import {BILLING_RELEASE,PRO_OFFER} from "../lib/core/plans.ts";
 const read=p=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
-test("5.0 release policy keeps premium and real payments disabled",()=>{
+test("5.1 release policy keeps premium and real payments disabled",()=>{
  assert.deepEqual(BILLING_RELEASE,{targetMajor:10,paymentsEnabled:false,premiumEnabled:false});
  assert.equal(PRO_OFFER.monthlyBudgetMicrousd,5_000_000);
  assert.equal(PRO_OFFER.priceTry,399);
@@ -21,7 +21,9 @@ test("retired image route has no provider integration",()=>{
 });
 test("release manifest and package lock versions match",()=>{
  const pkg=JSON.parse(read("package.json")),lock=JSON.parse(read("package-lock.json"));
- assert.equal(pkg.version,"5.0.0-rc.1");
+ const manifest=JSON.parse(read("public/manifest.webmanifest"));
+ assert.equal(pkg.version,"5.1.0");
  assert.equal(lock.version,pkg.version);
  assert.equal(lock.packages[""].version,pkg.version);
+ assert.equal(manifest.name,`NEXUS AI ${pkg.version.split(".").slice(0,2).join(".")}`);
 });

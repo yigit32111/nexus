@@ -77,7 +77,7 @@ try {
   await page.goto(base + "/");
   try {
     await page.locator(".nexus-splash img").waitFor({state:"visible"});
-    await page.getByText("5.0 RC1",{exact:true}).waitFor();
+    await page.getByText("5.1",{exact:true}).waitFor();
     assert.equal(await page.locator(".nexus-splash img").getAttribute("src"),"/icon.svg");
     console.log("OK branded loading state");
   } finally { releaseStatus(); }

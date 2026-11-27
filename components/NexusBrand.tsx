@@ -13,7 +13,7 @@ export function NexusSplash() {
         <h1>Hoş geldin.</h1>
         <p>Çalışma alanın hazırlanıyor…</p>
         <div className="nexus-progress" aria-hidden="true"><span/></div>
-        <small className="nexus-splash-version">5.0 RC1</small>
+        <small className="nexus-splash-version">5.1</small>
       </div>
     </main>
   );
