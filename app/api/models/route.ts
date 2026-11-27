@@ -97,7 +97,7 @@ export async function GET() {
           supportedParameters: Array.isArray(m.supported_parameters) ? m.supported_parameters : [],
         };
       })
-      .filter(m=>m.free)
+      .filter((m: {free:boolean})=>m.free)
       .sort(
         (a: any, b: any) =>
           Number(b.free) - Number(a.free) ||
