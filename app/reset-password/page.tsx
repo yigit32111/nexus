@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../utils/supabase/client";
+import { NexusLogo, NexusSplash } from "../../components/NexusBrand";
 import { Lock, Sparkles, ArrowRight } from "lucide-react";
 
 export default function ResetPasswordPage() {
@@ -61,12 +62,12 @@ export default function ResetPasswordPage() {
       <section className="auth-card">
         <div className="auth-brand">
           <div className="auth-orb">
-            <Sparkles size={25} />
+            <NexusLogo size={72} />
           </div>
           <h1>
             NEXUS<span>AI</span>
           </h1>
-          <p>PERSONAL INTELLIGENCE SYSTEM</p>
+          <p>Düşün, öğren, üret.</p>
         </div>
         <div className="auth-heading">
           <div className="auth-kicker">HESAP GÜVENLİĞİ</div>
@@ -114,7 +115,7 @@ export default function ResetPasswordPage() {
           </button>
         </div>
         <div className="auth-footer">
-          <span /> SECURE AUTHENTICATION
+          <span /> Güvenli oturum açma
         </div>
       </section>
     </main>

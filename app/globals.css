@@ -1637,3 +1637,35 @@ button, input, textarea, select { font-family: inherit !important; }
 
 .live-voice-controls .live-ctrl-btn {width:auto;min-width:52px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 16px;border-radius:999px}
 .live-voice-center > button {border:1px solid currentColor;border-radius:10px;padding:9px 14px}
+
+/* NEXUS welcome: shared local brand, real loading state, no artificial delay. */
+.nexus-logo{display:block;object-fit:contain;max-width:100%;height:auto;flex-shrink:0}
+.nexus-splash{padding:max(24px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom));background:radial-gradient(ellipse at 50% 35%,#286c9330,transparent 58%),var(--bg);overflow:auto}
+.nexus-splash .loading-mark{width:min(340px,100%);gap:13px;text-align:center;animation:nexus-enter .38s ease-out both}
+.nexus-splash-logo{padding:12px;border-radius:36px;box-shadow:0 0 54px #32a8dc24;animation:nexus-logo-in .48s ease-out both}
+.nexus-splash-word{font:700 26px 'Space Grotesk',sans-serif;letter-spacing:4px;color:var(--text)}
+.nexus-splash-word span{color:var(--accent);font-weight:500;font-size:18px;letter-spacing:1px}
+.nexus-splash h1{font-size:23px;font-weight:600;letter-spacing:-.6px;margin:10px 0 0}
+.nexus-splash p{font-size:14px;color:var(--muted);line-height:1.5;margin:0}
+.nexus-progress{height:3px;width:140px;overflow:hidden;border-radius:10px;background:var(--line);margin-top:9px}
+.nexus-progress span{display:block;height:100%;width:42%;background:var(--accent);border-radius:10px;animation:nexus-progress 1.5s ease-in-out infinite}
+.nexus-splash .nexus-splash-version{font:11px inherit;letter-spacing:0;color:var(--muted)}
+@keyframes nexus-enter{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+@keyframes nexus-logo-in{from{transform:scale(.94)}to{transform:scale(1)}}
+@keyframes nexus-progress{from{transform:translateX(-110%)}to{transform:translateX(340%)}}
+.auth-shell{background:radial-gradient(ellipse at 50% 0%,#286c9325,transparent 62%),var(--bg)}
+.auth-grid{opacity:.35}
+.auth-orb{width:76px;height:76px;border:0;background:transparent;box-shadow:0 10px 28px #32a8dc1b}
+.auth-brand h1{letter-spacing:4px;margin-top:13px}
+.auth-brand p,.auth-kicker,.auth-footer{font-family:inherit;letter-spacing:.1px;font-size:12px;text-transform:none;color:var(--muted)}
+.auth-heading p{font-size:14px;line-height:1.55}
+.auth-heading h2{letter-spacing:-.6px}
+.auth-card{animation:nexus-enter .35s ease-out both}
+.welcome-panel{margin:clamp(12px,4vh,45px) auto 26px;animation:nexus-enter .32s ease-out both}
+.nexus-welcome-logo{width:76px;margin:0 auto 15px;border-radius:23px;box-shadow:0 9px 32px #32a8dc18}
+.welcome-panel h1{line-height:1.22;font-size:clamp(23px,3vw,32px);max-width:620px;margin:10px auto}
+.welcome-panel>p{max-width:460px}
+.prompt-grid button:focus-visible,.auth-submit:focus-visible,.auth-switch button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.sidebar-brand .brand-symbol,.nexus-avatar{overflow:hidden}
+@media(max-width:540px){.nexus-welcome-logo{width:60px;margin-bottom:10px}.welcome-panel{margin:12px auto 16px}.welcome-panel h1{font-size:24px}.welcome-panel>p{font-size:13px}.prompt-grid{margin-top:16px}.prompt-grid button{min-height:49px}.auth-brand{margin-bottom:18px}}
+@media(prefers-reduced-motion:reduce){.nexus-splash .loading-mark,.nexus-splash-logo,.nexus-progress span,.auth-card,.welcome-panel{animation:none!important}}

@@ -39,6 +39,7 @@ import { CanvasPanel } from "../components/CanvasPanel";
 import { GemModal } from "../components/GemModal";
 import { SettingsModal } from "../components/SettingsModal";
 import { LiveVoiceModal } from "../components/LiveVoiceModal";
+import { NexusSplash } from "../components/NexusBrand";
 
 const CHAT_KEY = "nexus_chats_v3";
 const PREF_KEY = "nexus_prefs_v3";
@@ -747,20 +748,7 @@ export default function Home() {
   }
 
   if (loading || !userId) {
-    return (
-      <main className="loading-screen">
-        <div className="loading-mark">
-          <div className="brand-symbol">
-            <Sparkles size={24} />
-          </div>
-          <strong>
-            NEXUS<span>4.0</span>
-          </strong>
-          <small>ÇALIŞMA ALANI HAZIRLANIYOR</small>
-          <i />
-        </div>
-      </main>
-    );
+    return <NexusSplash />;
   }
 
   return (

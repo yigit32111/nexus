@@ -1,5 +1,7 @@
 "use client";
 
+import { NexusLogo } from "./NexusBrand";
+
 import {
   Archive,
   ArchiveRestore,
@@ -98,7 +100,7 @@ export function Sidebar({
       <aside className={`sidebar ${mobileMenu ? "mobile-open" : ""}`}>
         <div className="sidebar-brand">
           <div className="brand-symbol">
-            <Sparkles size={19} />
+            <NexusLogo size={34} decorative />
           </div>
           <div className="brand-word">
             <b>NEXUS</b>
