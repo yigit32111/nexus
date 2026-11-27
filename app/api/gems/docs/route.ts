@@ -1,4 +1,5 @@
 import {validDocumentId} from "../../../../lib/core/document-id";
+import { extractPdfText } from "../../../../lib/core/pdf-text";
 import {readJsonLimited} from "../../../../lib/core/request-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../../utils/supabase/server";
@@ -43,10 +44,11 @@ export async function POST(req: NextRequest) {
     let fullText = "";
     if (fileType === "application/pdf") {
       if(buffer.subarray(0,5).toString()!=="%PDF-")return NextResponse.json({error:"Geçersiz PDF."},{status:400});
-      const pdfModule = await import("pdf-parse");
-      const parse = (pdfModule as any).default ?? pdfModule;
-      const parsed = await parse(Uint8Array.from(buffer),{max:50});
-      fullText = String(parsed?.text || "");
+      try {
+        fullText = await extractPdfText(buffer);
+      } catch {
+        return NextResponse.json({ error: "PDF okunamadı." }, { status: 422 });
+      }
     } else {
       fullText = buffer.toString("utf8");
     }
@@ -68,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     const { error: dbError } = await supabase.from("nexus_gem_docs").insert(rows);
     if (dbError) {
-      console.error("NEXUS GEM DOC INSERT ERROR", dbError);
+      console.error("NEXUS GEM DOC INSERT ERROR", dbError.code);
       return NextResponse.json(
         { error: "Veritabanı tablosu (nexus_gem_docs) bulunamadı. SQL migration dosyasını çalıştır." },
         { status: 500 }
@@ -81,8 +83,8 @@ export async function POST(req: NextRequest) {
       size: buffer.length,
       chunkCount: chunks.length,
     });
-  } catch (error) {
-    console.error("NEXUS GEM DOC ERROR", error);
+  } catch {
+    console.error("NEXUS GEM DOC ERROR");
     return NextResponse.json({ error: "Doküman işlenirken hata oluştu." }, { status: 500 });
   }
 }

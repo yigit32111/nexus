@@ -1,5 +1,6 @@
 import {readJsonLimited} from "../../../lib/core/request-guard";
 import {compactHistory} from "../../../lib/core/smart-context";
+import { extractPdfText } from "../../../lib/core/pdf-text";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { writeUsageLog } from "../../../utils/supabase/admin";
@@ -153,17 +154,15 @@ export async function POST(req: NextRequest) {
           return fail("Geçerli bir PDF dosyası değil.");
         }
         try {
-          const pdfModule = await import("pdf-parse");
-          const parse = (pdfModule as any).default ?? pdfModule;
-          const parsed = await parse(Uint8Array.from(buffer),{max:50});
+          const text = await extractPdfText(buffer);
           extractedTexts.push(
-            `PDF: ${file.name}\n${String(parsed?.text || "PDF metni okunamadı.").slice(
+            `PDF: ${file.name}\n${(text || "PDF metni okunamadı.").slice(
               0,
               MAX_TEXT_LENGTH
             )}`
           );
-        } catch (error) {
-          console.error("NEXUS PDF ERROR", error);
+        } catch {
+          console.error("NEXUS PDF ERROR");
           return fail(`PDF okunamadı: ${file.name}`, 422);
         }
       } else if (file.type === "text/plain") {

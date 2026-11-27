@@ -82,6 +82,19 @@ try {
     console.log("OK branded loading state");
   } finally { releaseStatus(); }
   await page.getByText("fixture-visible", {exact:true}).waitFor();
+  const modelPicker = page.getByRole("button", { name: /^Model seç:/ });
+  for (const width of [1280, 320]) {
+    await page.setViewportSize({ width, height: 740 });
+    await modelPicker.click();
+    const search = page.getByRole("textbox", { name: "Model ara" });
+    await search.waitFor();
+    const bounds = await page.locator("#nexus-model-picker").boundingBox();
+    assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= width);
+    await search.press("Escape");
+    assert.equal(await modelPicker.getAttribute("aria-expanded"), "false");
+    assert.equal(await modelPicker.evaluate(element => element === document.activeElement), true);
+  }
+  await page.setViewportSize({ width: 1280, height: 740 });
   assert.equal(await page.getByTitle("Görsel üretim modunu aç/kapat").count(),0);
   assert.ok(await page.locator('input[type="file"]').count()>0);
   console.log("OK image generation UI removed; file input retained");
