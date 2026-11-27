@@ -11,3 +11,9 @@ test("catalog rejects nonfree aliases, changed pricing, missing pricing, unsuppo
  const parsed=parseFreeCatalog({data:rows});assert.equal(parsed.length,1);assert.equal(parsed[0].id,"fixture/model:free");assert.equal(parsed[0].vision,true);
 });
 test("bad provider data fails closed",()=>{for(const p of [null,{}, {data:"wrong"}])assert.throws(()=>parseFreeCatalog(p));});
+
+test("expired or invalid model entries never appear in free routing",()=>{
+ const now=Date.parse("2026-11-27T12:00:00Z");
+ const rows=[item("fixture/current:free",{expiration_date:null}),item("fixture/future:free",{expiration_date:"2026-12-01"}),item("fixture/expired:free",{expiration_date:"2026-11-26"}),item("fixture/today:free",{expiration_date:"2026-11-27"}),item("fixture/bad:free",{expiration_date:"2026-02-30"})];
+ assert.deepEqual(parseFreeCatalog({data:rows},now).map(x=>x.id),["fixture/current:free","fixture/future:free"]);
+});

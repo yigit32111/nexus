@@ -6,7 +6,7 @@ export function validProviderBase(value:unknown):boolean{
 export type FreeCatalogModel=CatalogModel&{name:string};
 const record=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==="object"&&!Array.isArray(v);
 const strings=(v:unknown):string[]=>Array.isArray(v)?v.filter((x):x is string=>typeof x==="string"):[];
-export function parseFreeCatalog(payload:unknown):FreeCatalogModel[]{
+export function parseFreeCatalog(payload:unknown,now=Date.now()):FreeCatalogModel[]{
  if(!record(payload)||!Array.isArray(payload.data))throw new Error("CORE_CATALOG");
  const result:FreeCatalogModel[]=[];
  const seen=new Set<string>();
@@ -16,6 +16,12 @@ export function parseFreeCatalog(payload:unknown):FreeCatalogModel[]{
   if(!record(m.pricing)||parsePrice(m.pricing.prompt)!==0||parsePrice(m.pricing.completion)!==0)continue;
   // Fail closed for nonzero or unknown additional pricing fields (including tools/reasoning).
   if(Object.values(m.pricing).some(v=>parsePrice(v)!==0))continue;
+  // Expired catalog entries can still appear in cached metadata.
+  if(m.expiration_date!==null&&m.expiration_date!==undefined){
+   if(typeof m.expiration_date!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(m.expiration_date))continue;
+   const expiry=Date.parse(m.expiration_date+"T00:00:00Z");
+   if(!Number.isFinite(expiry)||new Date(expiry).toISOString().slice(0,10)!==m.expiration_date||expiry<=now)continue;
+  }
   const context=Number(m.context_length);
   if(!Number.isSafeInteger(context)||context<4096)continue;
   seen.add(m.id);
