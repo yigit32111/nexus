@@ -4,8 +4,9 @@ const base="http://127.0.0.1:3001";
 const scenarios=[
  ...["/login","/manifest.webmanifest","/icon.svg"].map(path=>({path,method:"GET",allowed:[200]})),
  ...["/","/workspace","/admin"].map(path=>({path,method:"GET",allowed:[302,303,307,308,401,404]})),
- ...["/api/chat","/api/image","/api/artifacts","/api/research","/api/share","/api/gems/docs"].map(path=>({path,method:"POST",allowed:[401]})),
- ...["/api/status","/api/models"].map(path=>({path,method:"GET",allowed:[401]})),
+ ...["/api/chat","/api/artifacts","/api/research","/api/share","/api/gems/docs"].map(path=>({path,method:"POST",allowed:[401]})),
+ {path:"/api/image",method:"POST",allowed:[410]},
+  ...["/api/status","/api/models"].map(path=>({path,method:"GET",allowed:[401]})),
  {path:"/api/gems/docs",method:"DELETE",allowed:[401]},
  {path:"/api/chat",method:"POST",allowed:[401],body:{comparison:true,model:"auto",messages:[{role:"user",content:"test"}]}},
  {path:"/api/research",method:"POST",allowed:[401],body:{query:"test",scope:"academic"}}

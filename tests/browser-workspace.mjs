@@ -69,6 +69,9 @@ try {
   await page.route(base + "/api/status", route => route.fulfill({json:{model:"auto",provider:"OPENROUTER",configured:true,accountId:user.id,plan:"free",premiumEnabled:false}}));
   await page.goto(base + "/");
   await page.getByText("fixture-visible", {exact:true}).waitFor();
+  assert.equal(await page.getByTitle("Görsel üretim modunu aç/kapat").count(),0);
+  assert.ok(await page.locator('input[type="file"]').count()>0);
+  console.log("OK image generation UI removed; file input retained");
   page.once("dialog", dialog => dialog.accept());
   await page.getByTitle("Sil", {exact:true}).click();
   await page.getByText("fixture-visible", {exact:true}).waitFor({state:"detached"});

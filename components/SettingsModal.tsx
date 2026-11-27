@@ -538,7 +538,7 @@ export function SettingsModal({
                   </div>
                   <div>
                     <b>{stats.totalImages}</b>
-                    <span>Üretilen Görsel</span>
+                    <span>Geçmişte üretilen görseller</span>
                   </div>
                 </div>
 

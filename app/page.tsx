@@ -85,7 +85,6 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [imageMode, setImageMode] = useState(false);
   const [liveVoiceOpen, setLiveVoiceOpen] = useState(false);
 
   const [canvasDoc, setCanvasDoc] = useState<CanvasDoc | null>(null);
@@ -392,7 +391,7 @@ export default function Home() {
     });
   }
 
-  function recordUsage(model: string, promptTokens: number, completionTokens: number, isImage = false) {
+  function recordUsage(model: string, promptTokens: number, completionTokens: number) {
     const today = new Date().toISOString().slice(0, 10);
     setPrefs((p) => {
       const prev = p.usageStats || EMPTY_USAGE_STATS;
@@ -403,7 +402,7 @@ export default function Home() {
           totalMessages: prev.totalMessages + 1,
           totalPromptTokens: prev.totalPromptTokens + promptTokens,
           totalCompletionTokens: prev.totalCompletionTokens + completionTokens,
-          totalImages: prev.totalImages + (isImage ? 1 : 0),
+          totalImages: prev.totalImages,
           byModel: {
             ...prev.byModel,
             [model]: {
@@ -474,61 +473,9 @@ export default function Home() {
     if ((!rawContent && !files.length && !opts?.regenerateFrom) || busy || !activeChat) return "";
 
     const targetChatId = activeChat.id;
-    const isImageRequest =
-      imageMode || /^\/(?:ciz|çiz|imagine|image)\s+/i.test(rawContent);
-    const cleanPrompt = rawContent.replace(/^\/(?:ciz|çiz|imagine|image)\s+/i, "").trim();
-
-    // Image Generation Branch
-    if (isImageRequest && cleanPrompt) {
-      const userMsg: Message = {
-        id: uid(),
-        role: "user",
-        content: `🎨 Görsel isteği: ${cleanPrompt}`,
-        createdAt: Date.now(),
-      };
-      const updated = [...activeChat.messages, userMsg];
-      patchMessages(targetChatId, updated);
-      setInput("");
-      setImageMode(false);
-      setBusy(true);
-
-      try {
-        const res = await fetch("/api/image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: cleanPrompt }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Görsel oluşturulamadı.");
-
-        const imgMsg: Message = {
-          id: uid(),
-          role: "assistant",
-          content: cleanPrompt,
-          imageUrl: data.imageUrl,
-          createdAt: Date.now(),
-        };
-        patchMessages(targetChatId, [...updated, imgMsg]);
-        updateChat(targetChatId, (c) => ({
-          ...c,
-          title: c.title === "Yeni sohbet" ? titleFrom(cleanPrompt) : c.title,
-        }));
-        recordUsage(data.model || "flux", Math.ceil(cleanPrompt.length / 4), 1000, true);
-        return "Görsel oluşturuldu.";
-      } catch (err: any) {
-        patchMessages(targetChatId, [
-          ...updated,
-          {
-            id: uid(),
-            role: "assistant",
-            content: `**Görsel üretim hatası:** ${err?.message || "Bilinmeyen hata"}`,
-            createdAt: Date.now(),
-          },
-        ]);
-        return "";
-      } finally {
-        setBusy(false);
-      }
+    if (/^\/(?:ciz|çiz|imagine|image)(?:\s|$)/i.test(rawContent)) {
+      setNotice("Görsel üretimi 5.0'da kapalı. Görsel yükleyip analiz ettirebilirsin.");
+      return "";
     }
 
     const selectedFiles = [...files];
@@ -1040,8 +987,6 @@ export default function Home() {
             onToggleCodeExecution={() =>
               setPrefs((p) => ({ ...p, codeExecution: !p.codeExecution }))
             }
-            imageMode={imageMode}
-            onToggleImageMode={() => setImageMode((v) => !v)}
             onOpenLiveVoice={() => { recognitionRef.current?.abort(); setLiveVoiceOpen(true); }}
             isGroqProvider={isGroqProvider}
             onEnhancePrompt={() => setInput(buildEnhancedPrompt(input))}
