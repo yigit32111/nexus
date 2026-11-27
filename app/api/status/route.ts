@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
+import { validProviderBase,OPENROUTER_BASE } from "../../../lib/core/free-catalog";
 import { accountPlan, PRO_OFFER } from "../../../lib/core/plans";
 import { isCoreAdminId } from "../../../lib/core/permissions";
 
@@ -36,6 +37,6 @@ export async function GET() {
     provider,
     isAdmin: isCoreAdminId(user.id),
     accountId: user.id,
-    configured: Boolean(process.env.AI_API_KEY || process.env.GROQ_API_KEY),
+    configured: Boolean(process.env.AI_API_KEY && validProviderBase(process.env.AI_BASE_URL||OPENROUTER_BASE)),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }

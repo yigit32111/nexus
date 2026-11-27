@@ -299,32 +299,8 @@ export function SettingsModal({
 
                 <div className="setting-divider" />
                 <div className="settings-section-title">GELİŞMİŞ ARAÇLAR</div>
-                <label className="toggle-setting">
-                  <span>
-                    <Globe size={16} /> Web araması varsayılanı
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={prefs.webSearch}
-                    onChange={(e) =>
-                      onUpdatePrefs((p) => ({ ...p, webSearch: e.target.checked }))
-                    }
-                  />
-                </label>
-                {isGroqProvider && (
-                  <label className="toggle-setting">
-                    <span>
-                      <Code2 size={16} /> Kod çalıştırma varsayılanı
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={prefs.codeExecution}
-                      onChange={(e) =>
-                        onUpdatePrefs((p) => ({ ...p, codeExecution: e.target.checked }))
-                      }
-                    />
-                  </label>
-                )}
+                <p className="settings-description">Ücretli web eklentisi kapalı. Ücretsiz akademik araştırma ve Code Lab için çalışma alanını kullan.</p>
+                <button type="button" className="done-button" onClick={()=>window.location.assign("/workspace")}><Globe size={15}/> Çalışma alanını aç</button>
                 <label className="toggle-setting">
                   <span>
                     <Volume2 size={16} /> Yanıtları otomatik seslendir

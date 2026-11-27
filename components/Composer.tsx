@@ -201,10 +201,10 @@ export function Composer({
               type="button"
               className={`composer-tool-toggle ${webSearch ? "active" : ""}`}
               onClick={onToggleWebSearch}
-              title="Web aramasını aç/kapat"
+              title="Ücretsiz araştırma çalışma alanını aç"
             >
               <Globe size={15} />
-              <span>Web</span>
+              <span>Araştırma</span>
             </button>
 
             {isGroqProvider && (

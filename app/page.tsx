@@ -126,7 +126,8 @@ export default function Home() {
     () => prefs.memoryItems.filter((m) => m.approved),
     [prefs.memoryItems]
   );
-  const effectiveModelId = activeGem?.model || prefs.model;
+  const desiredModelId = activeGem?.model || prefs.model;
+  const effectiveModelId = models.some(m=>m.id===desiredModelId&&m.free===true) ? desiredModelId : "auto";
   const selectedModel = models.find((m) => m.id === effectiveModelId);
   const isGroqProvider = provider === "GROQ";
 
@@ -618,8 +619,8 @@ export default function Home() {
             systemPrompt: prefs.systemPrompt,
             gemId: activeGem?.id || "",
             gemInstruction: activeGem?.instruction || "",
-            webSearch: prefs.webSearch,
-            codeExecution: prefs.codeExecution,
+            webSearch: false,
+            codeExecution: false,
             liveVoice: opts?.liveVoice === true,
           },
           attachments: selectedFiles,
@@ -1033,8 +1034,8 @@ export default function Home() {
             textareaRef={textareaRef}
             isRecording={isRecording}
             onToggleDictate={toggleDictate}
-            webSearch={prefs.webSearch}
-            onToggleWebSearch={() => setPrefs((p) => ({ ...p, webSearch: !p.webSearch }))}
+            webSearch={false}
+            onToggleWebSearch={() => window.location.assign("/workspace")}
             codeExecution={prefs.codeExecution}
             onToggleCodeExecution={() =>
               setPrefs((p) => ({ ...p, codeExecution: !p.codeExecution }))

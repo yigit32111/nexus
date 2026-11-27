@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       return fail("İstek biçimi geçersiz.");
     }
 
-    const key = process.env.AI_API_KEY || process.env.GROQ_API_KEY;
+    const key = process.env.AI_API_KEY;
     if (!key) {
       return fail("Sunucuda AI_API_KEY tanımlanmamış. Ortam değişkenlerini kontrol et.", 503);
     }
