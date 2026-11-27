@@ -154,8 +154,8 @@ export function TopBar({
                   }}
                 >
                   <div>
-                    <b>Sunucu Varsayılanı ({provider})</b>
-                    <small>Ortam değişkeninde tanımlı varsayılan model</small>
+                    <b>NEXUS Auto (varsayılan)</b>
+                    <small>Uygun ücretsiz modeli sunucu seçer</small>
                   </div>
                   {selectedModelId === "" && <Check size={14} />}
                 </button>

@@ -6,7 +6,6 @@ import {
   FileText,
   Globe,
   Image as ImageIcon,
-  ImagePlus,
   LockKeyhole,
   Mic,
   Paperclip,
@@ -40,8 +39,6 @@ type ComposerProps = {
   onToggleWebSearch: () => void;
   codeExecution: boolean;
   onToggleCodeExecution: () => void;
-  imageMode: boolean;
-  onToggleImageMode: () => void;
   onOpenLiveVoice: () => void;
   isGroqProvider: boolean;
   onEnhancePrompt: () => void;
@@ -69,8 +66,6 @@ export function Composer({
   onToggleWebSearch,
   codeExecution,
   onToggleCodeExecution,
-  imageMode,
-  onToggleImageMode,
   onOpenLiveVoice,
   isGroqProvider,
   onEnhancePrompt,
@@ -143,11 +138,7 @@ export function Composer({
               onSubmit();
             }
           }}
-          placeholder={
-            imageMode
-              ? "Üretmek istediğin görseli detaylı tarif et (ör. Siberpunk İstanbul gecesi, 8k)…"
-              : "NEXUS'a sor (görsel yapıştırabilir veya dosya sürükleyebilirsin)"
-          }
+          placeholder="NEXUS'a sor (görsel yapıştırabilir veya dosya sürükleyebilirsin)"
           rows={1}
           disabled={busy}
         />
@@ -189,22 +180,12 @@ export function Composer({
 
             <button
               type="button"
-              className={`composer-tool-toggle ${imageMode ? "active" : ""}`}
-              onClick={onToggleImageMode}
-              title="Görsel üretim modunu aç/kapat"
-            >
-              <ImagePlus size={15} />
-              <span>Görsel</span>
-            </button>
-
-            <button
-              type="button"
               className={`composer-tool-toggle ${webSearch ? "active" : ""}`}
               onClick={onToggleWebSearch}
-              title="Web aramasını aç/kapat"
+              title="Ücretsiz araştırma çalışma alanını aç"
             >
               <Globe size={15} />
-              <span>Web</span>
+              <span>Araştırma</span>
             </button>
 
             {isGroqProvider && (
@@ -219,7 +200,7 @@ export function Composer({
               </button>
             )}
 
-            {input.trim().length >= 6 && !busy && !imageMode && (
+            {input.trim().length >= 6 && !busy && (
               <button
                 type="button"
                 className="composer-tool-toggle"

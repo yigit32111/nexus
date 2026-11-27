@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {notFound} from "next/navigation";
+import {BILLING_RELEASE,PRO_OFFER} from "../../lib/core/plans";
 import {getCoreAdmin} from "../../lib/core/permissions";
 import {createAdminClient} from "../../utils/supabase/admin";
 export const dynamic="force-dynamic";
@@ -32,14 +33,17 @@ export default async function AdminPage(){
     </dl>}
     <h2>Günlük kota durumu</h2>
     <p>Bugünkü istek: {sum("requests")} / {cfg.global_requests}</p>
-    <p>Görsel denemesi: {sum("images")} / {cfg.global_images}</p>
+    <p>Görsel üretimi: kapalı · geçmiş günlük denemeler: {sum("images")}</p>
     <p>Rezerve bütçe: {usd(sum("reserved_microusd"))} / {usd(Number(cfg.global_budget_microusd))}</p>
     <p>Bugün kota kullanan kullanıcı: {rows.count??data.length}</p>
     <p>Bugünkü kullanım logları: {logs.count??0}</p>
     <p>Genel istek kotası: {sum("requests") >= Number(cfg.global_requests) ? "Doldu" : "Kullanılabilir"}</p>
-    <h2>Kullanıcı limitleri</h2><p>İstek: {cfg.user_requests} · Görsel denemesi: {cfg.user_images} · Tahmini bütçe: {usd(Number(cfg.user_budget_microusd))}</p>
-    <p>Ücretli AI: {cfg.paid_enabled?"Açık":"Kapalı"}</p>
-    <p>Limitler yetkili Supabase yönetiminden düzenlenir. Görsel sağlayıcı masrafları ayrı izlenir. Kota muhasebesi gerçek fatura değildir.</p>
+    <h2>Kullanıcı limitleri</h2><p>İstek: {cfg.user_requests} · Tahmini bütçe: {usd(Number(cfg.user_budget_microusd))}</p>
+    <h2>Üyelik ve ödeme durumu</h2><p>Ücretli AI: {BILLING_RELEASE.premiumEnabled?"Açık":"Kapalı"}</p>
+    <p>Ödeme: {BILLING_RELEASE.paymentsEnabled?"Açık":"Kapalı"} · hedef {BILLING_RELEASE.targetMajor}.0</p>
+    <p>Planlanan Pro: {PRO_OFFER.priceTry} TL/ay · {PRO_OFFER.monthlyBudgetMicrousd/1e6} USD ortak bütçe. Gerçek cüzdan kurulmadı.</p>
+    <p>Veritabanındaki eski ücretli kota bayrağı: {cfg.paid_enabled?"Açık":"Kapalı"} (5.0 premium erişim vermez).</p>
+    <p>Limitler yetkili Supabase yönetiminden düzenlenir. Görsel üretim sağlayıcısı kaldırıldı. Kota muhasebesi gerçek fatura değildir.</p>
     {(rows.count??0)>data.length&&<p>Uyarı: satır limiti nedeniyle özet eksik.</p>}
   </main>;
 }

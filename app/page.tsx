@@ -76,6 +76,7 @@ export default function Home() {
   const [provider, setProvider] = useState("AI SAĞLAYICISI");
   const [configured, setConfigured] = useState(false);
   const [adminAccountId, setAdminAccountId] = useState("");
+  const [planStatus, setPlanStatus] = useState<{accountId:string;plan:"free"|"pro"}|null>(null);
   const [projects, setProjects] = useState<{id:string;name:string}[]>([]);
   const [projectFilter, setProjectFilter] = useState("");
 
@@ -84,7 +85,6 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [imageMode, setImageMode] = useState(false);
   const [liveVoiceOpen, setLiveVoiceOpen] = useState(false);
 
   const [canvasDoc, setCanvasDoc] = useState<CanvasDoc | null>(null);
@@ -125,7 +125,8 @@ export default function Home() {
     () => prefs.memoryItems.filter((m) => m.approved),
     [prefs.memoryItems]
   );
-  const effectiveModelId = activeGem?.model || prefs.model;
+  const desiredModelId = activeGem?.model || prefs.model;
+  const effectiveModelId = models.some(m=>m.id===desiredModelId&&m.free===true) ? desiredModelId : "auto";
   const selectedModel = models.find((m) => m.id === effectiveModelId);
   const isGroqProvider = provider === "GROQ";
 
@@ -253,6 +254,7 @@ export default function Home() {
         setProvider(String(s.provider || "AI"));
         setConfigured(Boolean(s.configured));
         setAdminAccountId(s.isAdmin === true ? String(s.accountId || "") : "");
+        setPlanStatus(typeof s.accountId === "string" ? {accountId:s.accountId,plan:s.plan==="pro"?"pro":"free"} : null);
         if (!hydrated.model && s.model) setPrefs((p) => ({ ...p, model: String(s.model) }));
       }
       if (modelResponse?.ok) {
@@ -389,7 +391,7 @@ export default function Home() {
     });
   }
 
-  function recordUsage(model: string, promptTokens: number, completionTokens: number, isImage = false) {
+  function recordUsage(model: string, promptTokens: number, completionTokens: number) {
     const today = new Date().toISOString().slice(0, 10);
     setPrefs((p) => {
       const prev = p.usageStats || EMPTY_USAGE_STATS;
@@ -400,7 +402,7 @@ export default function Home() {
           totalMessages: prev.totalMessages + 1,
           totalPromptTokens: prev.totalPromptTokens + promptTokens,
           totalCompletionTokens: prev.totalCompletionTokens + completionTokens,
-          totalImages: prev.totalImages + (isImage ? 1 : 0),
+          totalImages: prev.totalImages,
           byModel: {
             ...prev.byModel,
             [model]: {
@@ -471,61 +473,9 @@ export default function Home() {
     if ((!rawContent && !files.length && !opts?.regenerateFrom) || busy || !activeChat) return "";
 
     const targetChatId = activeChat.id;
-    const isImageRequest =
-      imageMode || /^\/(?:ciz|çiz|imagine|image)\s+/i.test(rawContent);
-    const cleanPrompt = rawContent.replace(/^\/(?:ciz|çiz|imagine|image)\s+/i, "").trim();
-
-    // Image Generation Branch
-    if (isImageRequest && cleanPrompt) {
-      const userMsg: Message = {
-        id: uid(),
-        role: "user",
-        content: `🎨 Görsel isteği: ${cleanPrompt}`,
-        createdAt: Date.now(),
-      };
-      const updated = [...activeChat.messages, userMsg];
-      patchMessages(targetChatId, updated);
-      setInput("");
-      setImageMode(false);
-      setBusy(true);
-
-      try {
-        const res = await fetch("/api/image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: cleanPrompt }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Görsel oluşturulamadı.");
-
-        const imgMsg: Message = {
-          id: uid(),
-          role: "assistant",
-          content: cleanPrompt,
-          imageUrl: data.imageUrl,
-          createdAt: Date.now(),
-        };
-        patchMessages(targetChatId, [...updated, imgMsg]);
-        updateChat(targetChatId, (c) => ({
-          ...c,
-          title: c.title === "Yeni sohbet" ? titleFrom(cleanPrompt) : c.title,
-        }));
-        recordUsage(data.model || "flux", Math.ceil(cleanPrompt.length / 4), 1000, true);
-        return "Görsel oluşturuldu.";
-      } catch (err: any) {
-        patchMessages(targetChatId, [
-          ...updated,
-          {
-            id: uid(),
-            role: "assistant",
-            content: `**Görsel üretim hatası:** ${err?.message || "Bilinmeyen hata"}`,
-            createdAt: Date.now(),
-          },
-        ]);
-        return "";
-      } finally {
-        setBusy(false);
-      }
+    if (/^\/(?:ciz|çiz|imagine|image)(?:\s|$)/i.test(rawContent)) {
+      setNotice("Görsel üretimi 5.0'da kapalı. Görsel yükleyip analiz ettirebilirsin.");
+      return "";
     }
 
     const selectedFiles = [...files];
@@ -585,6 +535,7 @@ export default function Home() {
     let accumulatedContent = "";
     let accumulatedReasoning = "";
     let receivedSources: RagSource[] = [];
+    let routedModel: string | undefined;
 
     try {
       const supportsTemp =
@@ -615,8 +566,8 @@ export default function Home() {
             systemPrompt: prefs.systemPrompt,
             gemId: activeGem?.id || "",
             gemInstruction: activeGem?.instruction || "",
-            webSearch: prefs.webSearch,
-            codeExecution: prefs.codeExecution,
+            webSearch: false,
+            codeExecution: false,
             liveVoice: opts?.liveVoice === true,
           },
           attachments: selectedFiles,
@@ -657,8 +608,9 @@ export default function Home() {
               } else if (evt.type === "content" && evt.text) {
                 accumulatedContent += evt.text;
               } else if (evt.type === "usage" && evt.usage) {
+                routedModel = typeof evt.usage.model === "string" && evt.usage.model.length <= 180 ? evt.usage.model : undefined;
                 recordUsage(
-                  evt.usage.model || effectiveModelId || "default",
+                  routedModel || effectiveModelId || "default",
                   Number(evt.usage.promptTokens) || 0,
                   Number(evt.usage.completionTokens) || 0
                 );
@@ -677,6 +629,7 @@ export default function Home() {
                             content: accumulatedContent,
                             reasoning: accumulatedReasoning,
                             ragSources: receivedSources.length ? receivedSources : undefined,
+                            modelId: routedModel,
                           }
                         : m
                     ),
@@ -705,6 +658,7 @@ export default function Home() {
                 content: accumulatedContent,
                 reasoning: accumulatedReasoning,
                 ragSources: receivedSources.length ? receivedSources : undefined,
+                            modelId: routedModel,
               }
             : m
         ),
@@ -1027,14 +981,12 @@ export default function Home() {
             textareaRef={textareaRef}
             isRecording={isRecording}
             onToggleDictate={toggleDictate}
-            webSearch={prefs.webSearch}
-            onToggleWebSearch={() => setPrefs((p) => ({ ...p, webSearch: !p.webSearch }))}
+            webSearch={false}
+            onToggleWebSearch={() => window.location.assign("/workspace")}
             codeExecution={prefs.codeExecution}
             onToggleCodeExecution={() =>
               setPrefs((p) => ({ ...p, codeExecution: !p.codeExecution }))
             }
-            imageMode={imageMode}
-            onToggleImageMode={() => setImageMode((v) => !v)}
             onOpenLiveVoice={() => { recognitionRef.current?.abort(); setLiveVoiceOpen(true); }}
             isGroqProvider={isGroqProvider}
             onEnhancePrompt={() => setInput(buildEnhancedPrompt(input))}
@@ -1084,6 +1036,7 @@ export default function Home() {
       {showSettings && (
         <SettingsModal
           isAdmin={Boolean(userId && adminAccountId === userId)}
+          accountPlan={planStatus?.accountId===userId ? planStatus.plan : null}
           tab={settingsTab}
           onChangeTab={setSettingsTab}
           onClose={() => setShowSettings(false)}
@@ -1106,12 +1059,12 @@ export default function Home() {
           email={email}
           importRef={importRef}
           onExportAll={() => {
-            const backup = { app: "NEXUS AI", version: "3.2.0", chats, prefs };
+            const backup = { app: "NEXUS AI", version: "5.0.0-rc.1", chats, prefs };
             const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "nexus-4.0-yedek.json";
+            a.download = "nexus-5.0-yedek.json";
             a.click();
             URL.revokeObjectURL(url);
           }}

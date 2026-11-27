@@ -1,7 +1,7 @@
 name: NEXUS Release CI
 on:
   push:
-    branches: ["feature/nexus-3.3-alpha1", "feature/nexus-4.0"]
+    branches: ["feature/nexus-3.3-alpha1", "feature/nexus-4.0", "feature/nexus-5.0"]
   pull_request:
     branches: ["main"]
 permissions:
@@ -17,6 +17,8 @@ jobs:
           node-version: "22"
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm test
+      - name: Public OpenRouter catalog compatibility (no inference or credentials)
+        run: node --experimental-strip-types tests/public-catalog.mjs
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
@@ -47,6 +49,7 @@ jobs:
           kill -0 "$pid"
           SMOKE_URL=http://127.0.0.1:3001 node tests/browser-smoke.mjs
           SMOKE_URL=http://127.0.0.1:3001 node tests/browser-workspace.mjs
+          node tests/local-load.mjs
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-placeholder

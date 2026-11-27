@@ -14,5 +14,13 @@ export function thinkingProfile(mode: unknown) {
 }
 
 export function canRetryFreeModel(status: number) {
-  return [408, 429, 500, 502, 503, 504].includes(status);
+  // Free-model rate limits can be shared across the entire provider account.
+  // Do not spend another request on a 429; let the user retry after the cooldown.
+  return [408, 500, 502, 503, 504].includes(status);
+}
+
+export function retryAfterSeconds(value: unknown): string | undefined {
+  if (typeof value !== "string" || !/^\d{1,6}$/.test(value)) return undefined;
+  const n = Number(value);
+  return n >= 1 && n <= 3600 ? String(n) : undefined;
 }

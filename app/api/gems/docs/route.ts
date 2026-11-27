@@ -1,3 +1,4 @@
+import {validDocumentId} from "../../../../lib/core/document-id";
 import {readJsonLimited} from "../../../../lib/core/request-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../../utils/supabase/server";
@@ -98,18 +99,25 @@ export async function DELETE(req: NextRequest) {
     const docId = searchParams.get("docId");
     const gemId = searchParams.get("gemId");
 
+    if (Boolean(docId) === Boolean(gemId)) return NextResponse.json({ error: "Tek bir belge veya Gem kimliği gerekli." }, { status: 400 });
+    const site=req.headers.get("sec-fetch-site");
+    if(site && site!=="same-origin" && site!=="none")return NextResponse.json({error:"Siteler arası istek reddedildi."},{status:403});
     if (docId) {
-      await supabase
+      if(!validDocumentId(docId))return NextResponse.json({error:"Geçersiz belge kimliği."},{status:400});
+      const {error}=await supabase
         .from("nexus_gem_docs")
         .delete()
         .eq("user_id", user.id)
-        .like("id", `${docId}_%`);
+        .like("id", `${docId}\\_%`);
+      if(error)return NextResponse.json({error:"Belge silinemedi."},{status:500});
     } else if (gemId) {
-      await supabase
+      if(!/^[A-Za-z0-9-]{1,100}$/.test(gemId))return NextResponse.json({error:"Geçersiz Gem kimliği."},{status:400});
+      const {error}=await supabase
         .from("nexus_gem_docs")
         .delete()
         .eq("user_id", user.id)
         .eq("gem_id", gemId);
+      if(error)return NextResponse.json({error:"Belgeler silinemedi."},{status:500});
     }
 
     return NextResponse.json({ ok: true });

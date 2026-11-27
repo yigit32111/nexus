@@ -4,7 +4,7 @@ async function wait(){for(let i=0;i<40;i++){try{const r=await fetch(base+"/login
 await wait();
 for(const path of ["/login","/manifest.webmanifest","/icon.svg"]){const r=await fetch(base+path,{redirect:"manual"});assert.equal(r.status,200,path);assert.equal(r.headers.get("x-content-type-options"),"nosniff",path);console.log("OK public",path)}
 for(const path of ["/","/workspace","/admin"]){const r=await fetch(base+path,{redirect:"manual"});assert.ok([302,303,307,308,401,404].includes(r.status),path+" returned "+r.status);console.log("OK protected",path)}
-for(const path of ["/api/chat","/api/image","/api/artifacts","/api/research","/api/share","/api/gems/docs"]){const r=await fetch(base+path,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}",redirect:"manual"});assert.equal(r.status,401,path);console.log("OK unauthorized API",path)}
+for(const path of ["/api/chat","/api/artifacts","/api/research","/api/share","/api/gems/docs"]){const r=await fetch(base+path,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}",redirect:"manual"});assert.equal(r.status,401,path);console.log("OK unauthorized API",path)}
 for(const path of ["/api/status","/api/models","/api/gems/docs"]){const r=await fetch(base+path,{method:path.endsWith("/docs")?"DELETE":"GET",redirect:"manual"});assert.equal(r.status,401,path);console.log("OK unauthorized API",path)}
 
 for (const [path, body] of [
@@ -20,3 +20,8 @@ for (const [path, body] of [
   assert.equal(response.status, 401, path);
   console.log("OK 4.0 authenticated-only operation", path);
 }
+
+// The currently deployed 4.0 still has the authenticated endpoint; local 5.0 must be inert.
+const retired=await fetch(base+"/api/image",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}",redirect:"manual"});
+if(new URL(base).hostname==="nexus-ifn5.onrender.com"&&retired.status===401){console.log("OK legacy live 4.0 image endpoint requires auth");}
+else {assert.equal(retired.status,410);assert.equal((await retired.json()).code,"IMAGE_GENERATION_REMOVED");console.log("OK retired image endpoint");}

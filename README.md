@@ -1,6 +1,6 @@
-# NEXUS AI 4.0
+# NEXUS AI 5.0 RC1
 
-NEXUS, Türkçe sohbet, kaynaklı araştırma, belge üretimi ve sesli konuşmayı aynı hesapta bir araya getiren bir yapay zekâ çalışma alanıdır. Bu yayın paketi **4.0.0** sürümünü içerir. Destek kapsamı ve doğrulama koşulları için [4.0.0 yayın notlarına](docs/4.0.0-release.md) bak. [NEXUS’u aç](https://nexus-ifn5.onrender.com) · [Güncel kaynak kodunu ZIP olarak indir](https://github.com/yigit32111/nexus/archive/refs/heads/main.zip)
+NEXUS, Türkçe sohbet, kaynaklı araştırma, belge üretimi ve sesli konuşmayı aynı hesapta bir araya getiren bir yapay zekâ çalışma alanıdır. Bu geliştirme dalı **5.0.0-rc.1** sürümünü içerir; canlı yayın 4.0.0 olarak korunmaktadır. Destek kapsamı ve doğrulama koşulları için [5.0 RC1 yayın notlarına](docs/5.0-rc1.md) bak. [NEXUS’u aç](https://nexus-ifn5.onrender.com) · [5.0 geliştirme dalı](https://github.com/yigit32111/nexus/pull/11)
 
 ## Nereden başlanır?
 
@@ -12,13 +12,13 @@ Hesabınla giriş yapıp **Yeni sohbet** aç. Model menüsünden **NEXUS Auto**�
 
 | Özellik | Nasıl çalışır? |
 | --- | --- |
-| Auto 2.0 | OpenRouter kataloğunda fiyatı ve yetenekleri kontrol edilen ücretsiz modeller arasından soruya, görsele ve bağlam uzunluğuna göre seçim yapar. Uygun geçici sağlayıcı hatalarında bir farklı model daha dener. Her deneme kotaya dahildir. |
+| Auto 3.0 | OpenRouter kataloğunda fiyatı ve yetenekleri kontrol edilen ücretsiz modeller arasından soruya, görsele ve bağlam uzunluğuna göre seçim yapar. Uygun geçici sağlayıcı hatalarında bir farklı model daha dener. Her deneme kotaya dahildir. |
 | Thinking Mode | Ayarlarda **Hızlı**, **Dengeli** veya **Derin analiz** seçilir. Hızlı profil çıktı uzunluğunu sınırlar. Derin analiz, model seçimini ve cevabın varsayım, belirsizlik ve gerekçeleri açıklamasını etkiler. |
 | Multi-AI | Aynı soruya iki farklı ücretsiz modelden sırayla yanıt alırsın. İstersen üçüncü çağrıyla ortak noktaları ve farklılıkları özetletir, sonucu düzenlemek için dosya alanına aktarırsın. İki uygun modelin kullanılabilir olması gerekir. |
 | Agent Mode | Yazı konusu için önce bir plan hazırlar. Planı inceledikten sonra ikinci aşamayı sen başlatırsın. Çıktı düzenlenebilir bir yazı taslağıdır. |
 | Yanıt araçları | Akış hâlinde yanıt, Markdown ve kod blokları, kopyalama, mesaj düzenleme, yeniden üretme, daha kısa veya ayrıntılı yanıt isteme ve sesli okuma. Sağlayıcı desteklediğinde düşünme içeriği ayrı açılabilir. |
-| Dosya ve görsel | PDF ve TXT içeriğini sohbete ekleyebilir, PNG, JPG veya WebP görsellerini yükleyebilir ya da yapıştırabilirsin. Görsel analizi uyumlu model gerektirir. Görsel üretimi ayrı Hugging Face bağlantısını kullanır. |
-| Web araması | Sohbetteki Web seçeneği sağlayıcının arama eklentisini kullanır. Kullanılabilirlik ve ücret, sunucunun kota ve bütçe ayarlarına bağlıdır. |
+| Dosya ve görsel | PDF ve TXT içeriğini sohbete ekleyebilir, PNG, JPG veya WebP görsellerini yükleyebilir ya da yapıştırabilirsin. Görsel analizi uyumlu model gerektirir. 5.0 geliştirme dalında görsel üretimi kaldırıldı; eski görsel mesajları korunur. |
+| Web araması | Ücretli arama eklentisi 5.0'da kapalı; ücretsiz araştırma çalışma alanından kullanılabilir. |
 
 ## Projeler, Gems ve Memory 3.0
 
@@ -75,8 +75,7 @@ Tarayıcıda `http://localhost:3000` adresini aç. Üretim için önce `npm run 
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Tarayıcı için yayımlanabilir anahtar. Eski projelerde `NEXT_PUBLIC_SUPABASE_ANON_KEY` kullanılabilir. |
 | `SUPABASE_SECRET_KEY` | Sunucuda kota, kullanım ve yetkili veri işlemleri. Eski anahtar için `SUPABASE_SERVICE_ROLE_KEY` desteklenir. |
 | `AI_API_KEY` | OpenRouter sunucu anahtarı |
-| `AI_BASE_URL`, `AI_MODEL` | İsteğe bağlı sağlayıcı adresi ve varsayılan model. 4.0 sohbet yönlendiricisi OpenRouter kataloğunu kullanır. Varsayılan adres `https://openrouter.ai/api/v1` değeridir. |
-| `HF_TOKEN` | Görsel üretimi için çıkarım yetkili Hugging Face anahtarı |
+| `AI_BASE_URL`, `AI_MODEL` | İsteğe bağlı sağlayıcı adresi ve varsayılan model. 5.0 yalnızca doğrulanmış ücretsiz OpenRouter modellerini kullanır; AI_MODEL, Auto için ikincil öncelik ipucudur. Varsayılan adres `https://openrouter.ai/api/v1` değeridir. |
 | `NEXUS_ADMIN_USER_ID` | Yönetim paneline erişecek Supabase kullanıcısının UUID değeri |
 | `NEXT_PUBLIC_APP_URL` | Paylaşım bağlantıları için uygulamanın dışarıdan erişilen adresi |
 

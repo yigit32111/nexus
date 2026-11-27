@@ -18,6 +18,7 @@ export type Message = {
   role: "user" | "assistant";
   content: string;
   reasoning?: string;
+  modelId?: string;
   imageUrl?: string;
   ragSources?: RagSource[];
   createdAt: number;
@@ -174,7 +175,7 @@ export const DEFAULT_PREFS: Prefs = {
   tone: "natural",
   thinkingMode: "balanced",
   temperature: 0.7,
-  model: "",
+  model: "auto",
   theme: "dark",
   voiceResponses: false,
   systemPrompt: "",
@@ -188,6 +189,6 @@ export const INTRO_MESSAGE: Message = {
   id: "intro",
   role: "assistant",
   content:
-    "Merhaba, ben NEXUS 4.0 Önizleme. Soru sorabilir, Gem bilgi bankana doküman yükleyebilir, Canvas 2.0 ile canlı React uygulamaları çalıştırabilir, görsel üretebilir veya NEXUS Live ile sesli sohbet edebilirsin.",
+    "Merhaba, ben NEXUS 5.0 RC1. Soru sorabilir, Gem bilgi bankana doküman yükleyebilir, Canvas 2.0 ile canlı React uygulamaları çalıştırabilir, yüklediğin görselleri analiz edebilir veya NEXUS Live ile sesli sohbet edebilirsin.",
   createdAt: Date.now(),
 };

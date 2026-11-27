@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
+import { validProviderBase,OPENROUTER_BASE } from "../../../lib/core/free-catalog";
+import { accountPlan, PRO_OFFER, BILLING_RELEASE } from "../../../lib/core/plans";
 import { isCoreAdminId } from "../../../lib/core/permissions";
 
 export const runtime = "nodejs";
@@ -28,10 +30,15 @@ export async function GET() {
     : "CUSTOM AI";
 
   return NextResponse.json({
-    model: process.env.AI_MODEL || "qwen/qwen3-vl-30b-a3b-instruct",
+    model: "auto",
+    plan: accountPlan(user.app_metadata),
+    premiumEnabled: BILLING_RELEASE.premiumEnabled,
+    paymentsEnabled: BILLING_RELEASE.paymentsEnabled,
+    billingTargetMajor: BILLING_RELEASE.targetMajor,
+    plannedProOffer: PRO_OFFER,
     provider,
     isAdmin: isCoreAdminId(user.id),
     accountId: user.id,
-    configured: Boolean(process.env.AI_API_KEY || process.env.GROQ_API_KEY),
+    configured: Boolean(process.env.AI_API_KEY && validProviderBase(process.env.AI_BASE_URL||OPENROUTER_BASE)),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
