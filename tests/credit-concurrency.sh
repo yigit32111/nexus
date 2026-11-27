@@ -4,10 +4,12 @@ set -euo pipefail
 : "${PG_CONTAINER:?CI postgres container required}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+pids=()
 for i in $(seq 1 20); do
   (docker exec "$PG_CONTAINER" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -Atc "set role service_role; select public.nexus_credit_reserve('00000000-0000-4000-8000-000000000002',gen_random_uuid(),500000);" > "$tmp/$i") &
+  pids+=("$!")
 done
-wait
+for pid in "${pids[@]}"; do wait "$pid"; done
 accepted=$(grep -hxc 't' "$tmp/"* | awk '{s+=$1} END {print s+0}')
 rejected=$(grep -hxc 'f' "$tmp/"* | awk '{s+=$1} END {print s+0}')
 test "$accepted" = 10
