@@ -76,6 +76,7 @@ export default function Home() {
   const [provider, setProvider] = useState("AI SAĞLAYICISI");
   const [configured, setConfigured] = useState(false);
   const [adminAccountId, setAdminAccountId] = useState("");
+  const [planStatus, setPlanStatus] = useState<{accountId:string;plan:"free"|"pro"}|null>(null);
   const [projects, setProjects] = useState<{id:string;name:string}[]>([]);
   const [projectFilter, setProjectFilter] = useState("");
 
@@ -253,6 +254,7 @@ export default function Home() {
         setProvider(String(s.provider || "AI"));
         setConfigured(Boolean(s.configured));
         setAdminAccountId(s.isAdmin === true ? String(s.accountId || "") : "");
+        setPlanStatus(typeof s.accountId === "string" ? {accountId:s.accountId,plan:s.plan==="pro"?"pro":"free"} : null);
         if (!hydrated.model && s.model) setPrefs((p) => ({ ...p, model: String(s.model) }));
       }
       if (modelResponse?.ok) {
@@ -585,6 +587,7 @@ export default function Home() {
     let accumulatedContent = "";
     let accumulatedReasoning = "";
     let receivedSources: RagSource[] = [];
+    let routedModel: string | undefined;
 
     try {
       const supportsTemp =
@@ -657,8 +660,9 @@ export default function Home() {
               } else if (evt.type === "content" && evt.text) {
                 accumulatedContent += evt.text;
               } else if (evt.type === "usage" && evt.usage) {
+                routedModel = typeof evt.usage.model === "string" && evt.usage.model.length <= 180 ? evt.usage.model : undefined;
                 recordUsage(
-                  evt.usage.model || effectiveModelId || "default",
+                  routedModel || effectiveModelId || "default",
                   Number(evt.usage.promptTokens) || 0,
                   Number(evt.usage.completionTokens) || 0
                 );
@@ -677,6 +681,7 @@ export default function Home() {
                             content: accumulatedContent,
                             reasoning: accumulatedReasoning,
                             ragSources: receivedSources.length ? receivedSources : undefined,
+                            modelId: routedModel,
                           }
                         : m
                     ),
@@ -705,6 +710,7 @@ export default function Home() {
                 content: accumulatedContent,
                 reasoning: accumulatedReasoning,
                 ragSources: receivedSources.length ? receivedSources : undefined,
+                            modelId: routedModel,
               }
             : m
         ),
@@ -1084,6 +1090,7 @@ export default function Home() {
       {showSettings && (
         <SettingsModal
           isAdmin={Boolean(userId && adminAccountId === userId)}
+          accountPlan={planStatus?.accountId===userId ? planStatus.plan : null}
           tab={settingsTab}
           onChangeTab={setSettingsTab}
           onClose={() => setShowSettings(false)}
@@ -1111,7 +1118,7 @@ export default function Home() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "nexus-4.0-yedek.json";
+            a.download = "nexus-5.0-yedek.json";
             a.click();
             URL.revokeObjectURL(url);
           }}

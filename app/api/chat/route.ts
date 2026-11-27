@@ -464,8 +464,8 @@ export async function POST(req: NextRequest) {
                   type: "usage",
                   usage: {
                     model: effectiveModel,
-                    promptTokens: promptTokensEst,
-                    completionTokens: completionTokensEst,
+                    promptTokens: Number.isSafeInteger(providerUsage?.prompt_tokens)&&providerUsage.prompt_tokens>=0?providerUsage.prompt_tokens:promptTokensEst,
+                    completionTokens: Number.isSafeInteger(providerUsage?.completion_tokens)&&providerUsage.completion_tokens>=0?providerUsage.completion_tokens:completionTokensEst,
                   },
                 })}\n\n`
               )

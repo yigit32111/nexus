@@ -66,6 +66,7 @@ try {
   await page.route("**/rest/v1/nexus_chats*", route => route.fulfill({
     json: route.request().method() === "GET" ? chats : [],
   }));
+  await page.route(base + "/api/status", route => route.fulfill({json:{model:"auto",provider:"OPENROUTER",configured:true,accountId:user.id,plan:"free",premiumEnabled:false}}));
   await page.goto(base + "/");
   await page.getByText("fixture-visible", {exact:true}).waitFor();
   page.once("dialog", dialog => dialog.accept());
@@ -92,6 +93,14 @@ try {
   await page.getByTitle("Canlı sohbeti bitir").click();
   console.log("OK browser voice controls with simulated speech and permission failure");
   console.log("OK deleting the last visible chat opens a fresh conversation");
+  await page.getByTitle("Ayarlar",{exact:true}).click();
+  await page.getByRole("button",{name:"Hesap ve veri"}).click();
+  await page.getByText("Planlanan ortak API bütçesi",{exact:true}).waitFor();
+  assert.equal(await page.getByText("5 USD / ay",{exact:true}).count(),1);
+  assert.equal(await page.getByText("399 TL / ay",{exact:true}).count(),1);
+  await page.getByText("Premium model erişimi",{exact:true}).waitFor();
+  await page.getByText("Kapalı",{exact:true}).waitFor();
+  console.log("OK planned subscription UI: premium access remains disabled");
 } finally {
   await browser.close();
 }

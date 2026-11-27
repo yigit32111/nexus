@@ -219,6 +219,7 @@ export function MessageList({
                   <>
                     <div className="message-heading">
                       <b>{activeGem ? activeGem.name : "NEXUS"}</b>
+                      {message.modelId && <small title="Sunucunun yönlendirdiği model" style={{overflowWrap:"anywhere"}}>{message.modelId}</small>}
                       <time>
                         {new Date(message.createdAt).toLocaleTimeString("tr-TR", {
                           hour: "2-digit",

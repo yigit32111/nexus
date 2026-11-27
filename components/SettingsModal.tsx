@@ -23,10 +23,12 @@ import {
   Volume2,
   X,
 } from "lucide-react";
+import {PRO_OFFER} from "../lib/core/plans";
 import { EMPTY_USAGE_STATS, MemoryCategory, ModelInfo, Prefs } from "../types/nexus";
 
 type SettingsModalProps = {
   isAdmin: boolean;
+  accountPlan: "free"|"pro"|null;
   tab: "general" | "gems" | "memory" | "analytics" | "account" | "system";
   onChangeTab: (tab: "general" | "gems" | "memory" | "analytics" | "account" | "system") => void;
   onClose: () => void;
@@ -50,6 +52,7 @@ type SettingsModalProps = {
 
 export function SettingsModal({
   isAdmin,
+  accountPlan,
   tab,
   onChangeTab,
   onClose,
@@ -106,7 +109,7 @@ export function SettingsModal({
       <section className="settings-dialog">
         <header className="settings-header">
           <div>
-            <div className="settings-eyebrow">NEXUS 4.0 Önizleme AYARLAR</div>
+            <div className="settings-eyebrow">NEXUS 5.0 Alpha AYARLAR</div>
             <h2>Ayarlar</h2>
             <p>Çalışma alanını, hafızanı ve kullanım istatistiklerini yönet.</p>
           </div>
@@ -254,7 +257,7 @@ export function SettingsModal({
                   value={prefs.model}
                   onChange={(e) => onUpdatePrefs((p) => ({ ...p, model: e.target.value }))}
                 >
-                  <option value="">Sunucu varsayılanı</option>
+                  <option value="">NEXUS Auto (varsayılan)</option>
                   <option value="auto">NEXUS Auto (ücretsiz)</option>
                   {models.map((m) => (
                     <option key={m.id} value={m.id}>
@@ -614,6 +617,13 @@ export function SettingsModal({
                   </div>
                 </div>
 
+                <div className="setting-divider" />
+                <div className="settings-section-title">ÜYELİK VE KREDİ</div>
+                <div className="system-info-row"><span>Hesap planı</span><b>{accountPlan === null ? "Doğrulanamadı" : accountPlan==="pro"?"Pro":"Free"}</b></div>
+                <div className="system-info-row"><span>Premium model erişimi</span><b>Kapalı</b></div>
+                <div className="system-info-row"><span>Planlanan Pro ücreti</span><b>{PRO_OFFER.priceTry} TL / ay</b></div>
+                <div className="system-info-row"><span>Planlanan ortak API bütçesi</span><b>{PRO_OFFER.monthlyBudgetMicrousd/1e6} USD / ay</b></div>
+                <p className="settings-description">GPT-5.6 Luna ve Claude Haiku 5.5 planlanıyor. Bu bir önizleme: ödeme alınmaz, gerçek kredi bakiyesi gösterilmez ve premium erişim verilmez.</p>
                 <div className="account-actions">
                   <button type="button" onClick={onExportAll}>
                     <Download size={15} /> Tüm verilerimi yedekle (.json)
@@ -656,7 +666,7 @@ export function SettingsModal({
                 </div>
 
                 {[
-                  ["Uygulama sürümü", "NEXUS AI 4.0 Önizleme"],
+                  ["Uygulama sürümü", "NEXUS AI 5.0 Alpha"],
                   ["Hesap oturumu", "Aktif"],
                   ["Hafıza kayıtları", String(prefs.memoryItems.length)],
                   ["Özel Gem sayısı", String(prefs.gems.length)],
