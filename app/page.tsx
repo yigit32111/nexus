@@ -30,6 +30,7 @@ import {
   titleFrom,
   uid,
 } from "../lib/nexus-utils";
+import {normalizeAppearance} from "../lib/core/appearance";
 import { speechError, speechText } from "../lib/core/speech";
 import { Sidebar } from "../components/Sidebar";
 import { TopBar } from "../components/TopBar";
@@ -71,6 +72,7 @@ export default function Home() {
 
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const appearance=normalizeAppearance(prefs.appearance);
 
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [modelsError, setModelsError] = useState("");
@@ -240,6 +242,7 @@ export default function Home() {
         gems: Array.isArray(source.gems) ? source.gems.slice(0, 30) : [],
         usageStats: source.usageStats ? { ...EMPTY_USAGE_STATS, ...source.usageStats } : EMPTY_USAGE_STATS,
         theme: source.theme === "light" ? "light" : "dark",
+        appearance:normalizeAppearance(source.appearance),
       };
       setPrefs(hydrated);
       setPrefsLoaded(true);
@@ -757,6 +760,9 @@ export default function Home() {
       className={`nexus-app ${sidebarOpen ? "sidebar-visible" : "sidebar-hidden"} ${
         canvasDoc ? "canvas-active" : ""
       }`}
+      data-accent={appearance.accent}
+      data-density={appearance.density}
+      data-motion={appearance.motion}
       onDragOver={(e) => {
         e.preventDefault();
         setIsDragging(true);

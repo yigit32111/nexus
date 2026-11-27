@@ -133,12 +133,13 @@ export function Composer({
           onChange={(e) => onInputChange(e.target.value)}
           onPaste={handlePaste}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               onSubmit();
             }
           }}
-          placeholder="NEXUS'a sor (görsel yapıştırabilir veya dosya sürükleyebilirsin)"
+          aria-label="NEXUS’a mesaj yaz"
+          placeholder="NEXUS’a bir şey sor…"
           rows={1}
           disabled={busy}
         />

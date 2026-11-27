@@ -1,3 +1,5 @@
+import type {Appearance} from "../lib/core/appearance";
+
 export type AttachmentMeta = {
   name: string;
   type: string;
@@ -111,6 +113,7 @@ export type Prefs = {
   temperature: number;
   model: string;
   theme: "dark" | "light";
+  appearance?: Appearance;
   voiceResponses: boolean;
   systemPrompt: string;
   webSearch: boolean;
@@ -179,6 +182,7 @@ export const DEFAULT_PREFS: Prefs = {
   temperature: 0.7,
   model: "auto",
   theme: "dark",
+  appearance: {accent:"ocean",density:"comfortable",motion:"normal"},
   voiceResponses: false,
   systemPrompt: "",
   webSearch: false,

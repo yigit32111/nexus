@@ -104,7 +104,7 @@ export function Sidebar({
           </div>
           <div className="brand-word">
             <b>NEXUS</b>
-            <span>PERSONAL INTELLIGENCE 3.1</span>
+            <span>5.2 · EXPERIENCE PREVIEW</span>
           </div>
           <button
             type="button"

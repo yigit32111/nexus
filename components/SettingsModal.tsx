@@ -23,6 +23,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
+import {ACCENTS,normalizeAppearance} from "../lib/core/appearance";
 import {PRO_OFFER} from "../lib/core/plans";
 import { EMPTY_USAGE_STATS, MemoryCategory, ModelInfo, Prefs } from "../types/nexus";
 
@@ -78,6 +79,7 @@ export function SettingsModal({
   const [editingMemory, setEditingMemory] = useState<string | null>(null);
   const [editingMemoryText, setEditingMemoryText] = useState("");
 
+  const appearance=normalizeAppearance(prefs.appearance);
   const approvedMemory = prefs.memoryItems.filter((m) => m.approved);
   const stats = prefs.usageStats || EMPTY_USAGE_STATS;
   const totalTokens = stats.totalPromptTokens + stats.totalCompletionTokens;
@@ -109,11 +111,11 @@ export function SettingsModal({
       <section className="settings-dialog">
         <header className="settings-header">
           <div>
-            <div className="settings-eyebrow">NEXUS 5.0 RC1 AYARLAR</div>
+            <div className="settings-eyebrow">NEXUS 5.2 EXPERIENCE · ÖNİZLEME</div>
             <h2>Ayarlar</h2>
             <p>Çalışma alanını, hafızanı ve kullanım istatistiklerini yönet.</p>
           </div>
-          <button type="button" className="icon-button" onClick={onClose}>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Ayarları kapat">
             <X size={18} />
           </button>
         </header>
@@ -185,6 +187,22 @@ export function SettingsModal({
                   </button>
                 </div>
 
+                <label className="setting-label spaced">Vurgu rengi</label>
+                <div className="nx52-accent-options" role="group" aria-label="Vurgu rengi">
+                  {ACCENTS.map(a=><button key={a.id} type="button" aria-pressed={appearance.accent===a.id} className={appearance.accent===a.id?"active":""}
+                    onClick={()=>onUpdatePrefs(p=>({...p,appearance:{...normalizeAppearance(p.appearance),accent:a.id}}))}>
+                    <span className="nx52-swatch" style={{background:a.swatch}} aria-hidden="true"/>{a.label}
+                    {appearance.accent===a.id&&<Check size={14} aria-hidden="true"/>}
+                  </button>)}
+                </div>
+                <label className="setting-label spaced">Mesaj yoğunluğu</label>
+                <div className="segmented" role="group" aria-label="Mesaj yoğunluğu">
+                  {(["comfortable","compact"] as const).map(d=><button type="button" key={d} className={appearance.density===d?"active":""} aria-pressed={appearance.density===d}
+                    onClick={()=>onUpdatePrefs(p=>({...p,appearance:{...normalizeAppearance(p.appearance),density:d}}))}>{d==="comfortable"?"Rahat":"Kompakt"}</button>)}
+                </div>
+                <label className="toggle-setting"><span>Azaltılmış animasyon</span><input type="checkbox" checked={appearance.motion==="reduced"}
+                  onChange={e=>onUpdatePrefs(p=>({...p,appearance:{...normalizeAppearance(p.appearance),motion:e.target.checked?"reduced":"normal"}}))}/></label>
+                <p className="settings-description">Görünüm tercihleri hesap ayarlarıyla kaydedilir. Cihazının hareket azaltma tercihi de korunur.</p>
                 <div className="setting-divider" />
                 <div className="settings-section-title">YANIT TERCİHLERİ</div>
                 <label className="setting-label">Yanıt uzunluğu</label>
