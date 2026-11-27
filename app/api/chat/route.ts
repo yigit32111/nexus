@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { writeUsageLog } from "../../../utils/supabase/admin";
 import { estimateTokens } from "../../../lib/nexus-utils";
-import { thinkingProfile, canRetryFreeModel } from "../../../lib/core/chat-profiles";
+import { thinkingProfile, canRetryFreeModel, retryAfterSeconds } from "../../../lib/core/chat-profiles";
 import { routeModel } from "../../../lib/core/model-router";
 import { reserveRequest, reportedCost } from "../../../lib/core/budget";
 import {relevantMemory,summarizeHistory,recallChats} from "../../../lib/workspace/intelligence";
@@ -376,13 +376,19 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       await response.body?.cancel().catch(() => {});
-      const message =
-        response.status === 401
-          ? "AI sağlayıcı anahtarı geçersiz."
-          : response.status === 429
-          ? "AI sağlayıcısının hız sınırına ulaşıldı. Biraz sonra tekrar dene."
-          : `AI sağlayıcı hatası (${response.status}).`;
-      return NextResponse.json({ error: message }, { status: 502 });
+      if (response.status === 429) {
+        const wait = retryAfterSeconds(response.headers.get("retry-after"));
+        return NextResponse.json(
+          {error:"Ücretsiz AI sağlayıcısının ortak hız veya kullanım sınırına ulaşıldı. Daha sonra tekrar dene."},
+          {status:429,headers:{"Cache-Control":"no-store",...(wait ? {"Retry-After":wait} : {})}}
+        );
+      }
+      const message = response.status === 401
+        ? "AI sağlayıcısına bağlanılamadı."
+        : response.status === 402
+        ? "AI sağlayıcısının hesap veya kredi sınırı nedeniyle ücretsiz istek tamamlanamadı. Ücretli modele geçilmedi."
+        : `AI sağlayıcı hatası (${response.status}).`;
+      return NextResponse.json({ error: message }, { status: 502, headers:{"Cache-Control":"no-store"} });
     }
 
     if (wantStream && response.body) {

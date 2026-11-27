@@ -23,7 +23,7 @@ test("model routing with 1000 synthetic candidates and 100 queries",()=>{
  assert.equal(chooseModel(catalog,"auto","","",0,200000),undefined);
 });
 test("retry policy and navigation boundaries",()=>{
- for(let s=400;s<600;s++)assert.equal(canRetryFreeModel(s),[408,429,500,502,503,504].includes(s));
+ for(let s=400;s<600;s++)assert.equal(canRetryFreeModel(s),[408,500,502,503,504].includes(s));
  for(const path of ["//fixture.invalid","https://fixture.invalid","/%2f","/admin/../unknown","/other"])assert.equal(safeInternalPath(path),"/");
  assert.equal(safeInternalPath("/workspace?view=research"),"/workspace?view=research");
 });

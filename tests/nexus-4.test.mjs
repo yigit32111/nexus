@@ -12,8 +12,8 @@ test("thinking profiles preserve existing defaults and bound fast replies", () =
 });
 
 test("model fallback is restricted to temporary upstream failures", () => {
-  for (const status of [408, 429, 500, 502, 503, 504]) assert.equal(canRetryFreeModel(status), true);
-  for (const status of [200, 400, 401, 402, 403, 404, 422]) assert.equal(canRetryFreeModel(status), false);
+  for (const status of [408, 500, 502, 503, 504]) assert.equal(canRetryFreeModel(status), true);
+  for (const status of [200, 400, 401, 402, 403, 404, 422, 429]) assert.equal(canRetryFreeModel(status), false);
 });
 
 test("a nonzero price in any modality disqualifies a free model", () => {
