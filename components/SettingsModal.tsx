@@ -349,6 +349,8 @@ export function SettingsModal({
 
                 <label className="toggle-setting"><span><Brain size={16}/> Önceki sohbetleri hatırla</span><input type="checkbox" checked={prefs.historyRecall===true&&prefs.memoryMode==="hybrid"} disabled={prefs.memoryMode!=="hybrid"} onChange={e=>onUpdatePrefs(p=>({...p,historyRecall:e.target.checked}))}/></label>
                 <p className="settings-description">İsteğe bağlıdır. Akıllı modda ilgili eski sohbet parçaları AI sağlayıcısına gönderilebilir. Proje sohbetlerinde yalnızca aynı proje taranır. Kapattığında bu arama durur; eski sohbetlerin silinmez.</p>
+                <label className="toggle-setting"><span><Brain size={16}/> Smart Context · Akıllı sohbet bağlamı</span><input type="checkbox" checked={prefs.smartContext!==false} onChange={e=>onUpdatePrefs(p=>({...p,smartContext:e.target.checked}))}/></label>
+                <p className="settings-description">Uzun sohbetlerde eski mesajlar kısaltılabilir; son 12 mesaj korunur. Bu özellik sohbetleri silmez, kalıcı hafızayı değiştirmez. Kesin geçmiş, kod ve dosya gerektiren isteklerde kısaltma yapılmaz. Tam bağlam için kapatabilirsin (sunucunun mevcut 32 mesaj sınırı geçerlidir).</p>
                 <label className="setting-label">Hafıza modu</label>
                 <div className="segmented three memory-modes">
                   <button

@@ -564,6 +564,7 @@ export default function Home() {
             temperature: prefs.temperature,
             memoryMode: prefs.memoryMode,
             historyRecall: prefs.historyRecall === true,
+            smartContext: prefs.smartContext !== false,
             systemPrompt: prefs.systemPrompt,
             gemId: activeGem?.id || "",
             gemInstruction: activeGem?.instruction || "",
