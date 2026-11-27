@@ -1,0 +1,34 @@
+name: NEXUS Credit Engine CI
+on:
+  push:
+    branches: ["feature/nexus-5.0"]
+  pull_request:
+    branches: ["main"]
+permissions:
+  contents: read
+jobs:
+  credit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: local-ci-only
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PG_CONTAINER: ${{ job.services.postgres.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize isolated database
+        run: |
+          docker exec -i "$PG_CONTAINER" psql -X -U postgres -v ON_ERROR_STOP=1 < tests/credit-fixture.sql
+          docker exec -i "$PG_CONTAINER" psql -X -U postgres -v ON_ERROR_STOP=1 < supabase/manual/05_credit_engine_draft.sql
+      - name: Credit ledger and access assertions
+        run: docker exec -i "$PG_CONTAINER" psql -X -U postgres -v ON_ERROR_STOP=1 < tests/credit-engine.sql
+      - name: Concurrent credit reservations
+        run: bash tests/credit-concurrency.sh
