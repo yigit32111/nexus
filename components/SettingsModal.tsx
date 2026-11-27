@@ -595,11 +595,15 @@ export function SettingsModal({
 
                 <div className="setting-divider" />
                 <div className="settings-section-title">ÜYELİK VE KREDİ</div>
-                <div className="system-info-row"><span>Hesap planı</span><b>{accountPlan === null ? "Doğrulanamadı" : accountPlan==="pro"?"Pro":"Free"}</b></div>
+                <div className="system-info-row"><span>Hesap planı</span><b>{accountPlan === null ? "Doğrulanamadı" : accountPlan==="pro"?"Pro · Yönetici önizlemesi":"Free"}</b></div>
                 <div className="system-info-row"><span>Premium model erişimi</span><b>Kapalı</b></div>
                 <div className="system-info-row"><span>Planlanan Pro ücreti</span><b>{PRO_OFFER.priceTry} TL / ay</b></div>
                 <div className="system-info-row"><span>Planlanan ortak API bütçesi</span><b>{PRO_OFFER.monthlyBudgetMicrousd/1e6} USD / ay</b></div>
-                <p className="settings-description">GPT-5.6 Luna ve Claude Haiku 5.5 planlanıyor. Bu bir önizleme: ödeme alınmaz, gerçek kredi bakiyesi gösterilmez ve premium erişim verilmez.</p>
+                {isAdmin && accountPlan==="pro" ? <>
+                  <p className="settings-description">Yalnızca yönetici hesabına özel Pro tasarım önizlemesi. Bu model seçenekleri çalışmaz; ücretli istek ve ödeme kapalıdır.</p>
+                  <div className="system-info-row"><span>GPT-5.6 Luna</span><button type="button" disabled>Kilitli</button></div>
+                  <div className="system-info-row"><span>Claude Haiku 5.5</span><button type="button" disabled>Kilitli</button></div>
+                </> : <p className="settings-description">Free erişimi. Ücretli modeller ve ödeme kapalıdır.</p>}
                 <div className="account-actions">
                   <button type="button" onClick={()=>window.location.assign("/plans")}> <ShieldCheck size={15}/> Üyelik ve ödeme önizlemesi</button>
                   <button type="button" onClick={onExportAll}>

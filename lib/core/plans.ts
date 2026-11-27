@@ -24,3 +24,8 @@ export function accountPlan(appMetadata:unknown):"free"|"pro" {
 export function canReservePro(spent:number,reserved:number,next:number):boolean {
  return [spent,reserved,next].every(v=>Number.isSafeInteger(v)&&v>=0&&v<=PRO_OFFER.monthlyBudgetMicrousd)&&spent+reserved+next<=PRO_OFFER.monthlyBudgetMicrousd;
 }
+
+// Owner-only display preview; never grants inference, subscription, or credit access.
+export function ownerPreviewPlan(verifiedAdmin:unknown):"free"|"pro" {
+ return verifiedAdmin === true ? "pro" : "free";
+}

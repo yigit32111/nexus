@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { validProviderBase,OPENROUTER_BASE } from "../../../lib/core/free-catalog";
-import { accountPlan, PRO_OFFER, BILLING_RELEASE } from "../../../lib/core/plans";
+import { ownerPreviewPlan, PRO_OFFER, BILLING_RELEASE } from "../../../lib/core/plans";
 import { isCoreAdminId } from "../../../lib/core/permissions";
 
 export const runtime = "nodejs";
@@ -31,7 +31,7 @@ export async function GET() {
 
   return NextResponse.json({
     model: "auto",
-    plan: accountPlan(user.app_metadata),
+    plan: ownerPreviewPlan(isCoreAdminId(user.id)),
     premiumEnabled: BILLING_RELEASE.premiumEnabled,
     paymentsEnabled: BILLING_RELEASE.paymentsEnabled,
     billingTargetMajor: BILLING_RELEASE.targetMajor,

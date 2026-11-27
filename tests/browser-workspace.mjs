@@ -103,10 +103,33 @@ try {
   assert.equal(await page.getByText("399 TL / ay",{exact:true}).count(),1);
   await page.getByText("Premium model erişimi",{exact:true}).waitFor();
   await page.getByText("Kapalı",{exact:true}).waitFor();
+  await page.getByText("Free erişimi. Ücretli modeller ve ödeme kapalıdır.",{exact:true}).waitFor();
+  assert.equal(await page.getByText("GPT-5.6 Luna",{exact:true}).count(),0);
+  assert.equal(await page.getByText("Claude Haiku 5.5",{exact:true}).count(),0);
+  console.log("OK free account: no owner-only premium controls");
   await page.getByRole("button",{name:"Üyelik ve ödeme önizlemesi"}).click();
   await page.getByRole("heading",{name:"Üyelik planları"}).waitFor();
   assert.equal(new URL(page.url()).pathname,"/plans");
   console.log("OK planned subscription UI: premium access remains disabled");
+
+  const beforeOwner=prompts.length;
+  // Fresh client session render; status responses are fixtures, not production authentication.
+  await page.unroute(base + "/api/status");
+  await page.route(base + "/api/status", route=>route.fulfill({json:{
+    model:"auto",provider:"OPENROUTER",configured:true,accountId:user.id,
+    plan:"pro",isAdmin:true,premiumEnabled:false,paymentsEnabled:false
+  }}));
+  await page.goto(base+"/");
+  await page.getByTitle("Ayarlar",{exact:true}).click();
+  await page.getByRole("button",{name:"Hesap ve veri"}).click();
+  await page.getByText("Pro · Yönetici önizlemesi",{exact:true}).waitFor();
+  for(const name of ["GPT-5.6 Luna","Claude Haiku 5.5"]){
+    const row=page.locator(".system-info-row").filter({has:page.getByText(name,{exact:true})});
+    assert.equal(await row.getByRole("button",{name:"Kilitli",exact:true}).isDisabled(),true);
+  }
+  assert.equal(prompts.length,beforeOwner);
+  console.log("OK owner Pro preview: both model placeholders disabled, no chat request");
+
 } finally {
   await browser.close();
 }

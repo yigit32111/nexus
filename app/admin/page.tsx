@@ -26,8 +26,8 @@ export default async function AdminPage(){
     {counts.error || !counts.data ? <p>Göstergeler alınamadı.</p> : <dl className="admin-metrics">
       {Object.entries({
         "Çevrimiçi · son 2 dakika": counts.data.online,
-        "Free hesap": counts.data.free,
-        "Pro hesap": counts.data.pro,
+        "Free etiketli hesap (eski metadata)": counts.data.free,
+        "Pro etiketli hesap (eski metadata)": counts.data.pro,
         "Toplam token · tüm zamanlar": counts.data.tokens
       }).map(([label,value])=><div key={label}><dt>{label}</dt><dd>{BigInt(String(value)).toLocaleString("tr-TR")}</dd></div>)}
     </dl>}
@@ -39,7 +39,7 @@ export default async function AdminPage(){
     <p>Bugünkü kullanım logları: {logs.count??0}</p>
     <p>Genel istek kotası: {sum("requests") >= Number(cfg.global_requests) ? "Doldu" : "Kullanılabilir"}</p>
     <h2>Kullanıcı limitleri</h2><p>İstek: {cfg.user_requests} · Tahmini bütçe: {usd(Number(cfg.user_budget_microusd))}</p>
-    <h2>Üyelik ve ödeme durumu</h2><p>Ücretli AI: {BILLING_RELEASE.premiumEnabled?"Açık":"Kapalı"}</p>
+    <h2>Üyelik ve ödeme durumu</h2><p>Yönetici Pro önizlemesi: açık · diğer hesapların erişimi: Free. Eski hesap etiketleri ücretli erişim sağlamaz.</p><p>Ücretli AI: {BILLING_RELEASE.premiumEnabled?"Açık":"Kapalı"}</p>
     <p>Ödeme: {BILLING_RELEASE.paymentsEnabled?"Açık":"Kapalı"} · hedef {BILLING_RELEASE.targetMajor}.0</p>
     <p>Planlanan Pro: {PRO_OFFER.priceTry} TL/ay · {PRO_OFFER.monthlyBudgetMicrousd/1e6} USD ortak bütçe. Gerçek cüzdan kurulmadı.</p>
     <p>Veritabanındaki eski ücretli kota bayrağı: {cfg.paid_enabled?"Açık":"Kapalı"} (5.0 premium erişim vermez).</p>
