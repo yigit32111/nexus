@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 // Fixed codes only. Never accept an Error, request, user object, URL or message.
-const CODES = ["CHAT_INTERNAL","CHAT_TIMEOUT","CHAT_PROVIDER_FAILURE","USAGE_LOG_FAILURE","NEXT_SERVER_ERROR"] as const;
+const CODES = ["CHAT_INTERNAL","CHAT_TIMEOUT","CHAT_PROVIDER_FAILURE","USAGE_LOG_FAILURE","NEXT_SERVER_ERROR","MONITOR_TEST"] as const;
 export type TechnicalEvent = typeof CODES[number];
 export function sentryEndpoint(raw: unknown): URL | null {
   if (typeof raw !== "string" || raw.length > 512 || raw !== raw.trim()) return null;

@@ -59,3 +59,14 @@ test("monitor is server-only, does not use read token or expose a public test ro
  assert.doesNotMatch(source,/SENTRY_AUTH_TOKEN|NEXT_PUBLIC_SENTRY/);
  assert.match(read("instrumentation.ts"),/onRequestError:Instrumentation.onRequestError=async\(\)=>/);
 });
+
+test("manual monitor test sends only a fixed synthetic event after admin verification",()=>{
+ const read=p=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
+ const action=read("app/admin/monitor-action.ts");
+ assert.ok(action.indexOf("if(!await getCoreAdmin())")<action.indexOf('await reportTechnicalEvent("MONITOR_TEST")'));
+ assert.match(action,/^"use server"/);
+ assert.match(action,/sentryEndpoint\(process\.env\.SENTRY_DSN\)/);
+ assert.doesNotMatch(action,/formData\.(get|entries)|SENTRY_AUTH_TOKEN|console\./);
+ assert.equal(JSON.parse(technicalEnvelope("MONITOR_TEST",1700000000000).trim().split("\n")[2]).message,"NEXUS MONITOR_TEST");
+ assert.match(read("app/admin/page.tsx"),/<SentryTestPanel\/>/);
+});
