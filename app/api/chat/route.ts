@@ -290,7 +290,7 @@ export async function POST(req: NextRequest) {
     if (requestedModel && (requestedModel.length > 180 || !MODEL_RE.test(requestedModel))) {
       return fail("Model kimliği geçersiz.");
     }
-    const model = requestedModel || process.env.AI_MODEL || "qwen/qwen3-vl-30b-a3b-instruct";
+    const model = requestedModel || "auto";
     const selectedSupportsVision =
       body.modelSupportsVision === true || VISION_ID_RE.test(model) || model === "auto";
 
@@ -308,6 +308,7 @@ export async function POST(req: NextRequest) {
     const comparison = body.comparison === true;
     const excludedModel = comparison && typeof body.excludeModel === "string" ? body.excludeModel.slice(0, 200) : undefined;
     const useWebSearch = !comparison && preferences.webSearch === true;
+    if(useWebSearch)return fail("Ücretli sağlayıcı web araması bu önizlemede kapalı. Ücretsiz araştırma için çalışma alanını kullan.",403);
     const profile = thinkingProfile(preferences.thinkingMode);
     const completionSystem = system + profile.instruction;
     const useCodeExecution = preferences.codeExecution === true;
@@ -317,7 +318,7 @@ export async function POST(req: NextRequest) {
     const wantStream = body.stream !== false;
     const textOnly=completionSystem+JSON.stringify(messages.map(m=>({role:m.role,content:Array.isArray(m.content)?m.content.filter(x=>x.type==="text"):m.content})));
     const promptTokensEst = estimateTokens(textOnly);
-    const automatic = comparison || requestedModel === "auto";
+    const automatic = comparison || !requestedModel || requestedModel === "auto";
     const routing = {
       base, key, requested: automatic ? "auto" : requestedModel,
       defaultId: process.env.AI_MODEL || model,
@@ -325,7 +326,7 @@ export async function POST(req: NextRequest) {
       images: imageParts.length,
       inputTokens: Buffer.byteLength(textOnly) + imageParts.length * 8192,
       web: useWebSearch,
-      freeOnly: automatic,
+      freeOnly: true, // Premium access remains disabled until atomic wallet and payment validation exist.
       exclude: excludedModel,
     };
     const first = await routeModel(routing).catch(() => null);

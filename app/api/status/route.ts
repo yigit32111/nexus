@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
+import { accountPlan, PRO_OFFER } from "../../../lib/core/plans";
 import { isCoreAdminId } from "../../../lib/core/permissions";
 
 export const runtime = "nodejs";
@@ -28,7 +29,10 @@ export async function GET() {
     : "CUSTOM AI";
 
   return NextResponse.json({
-    model: process.env.AI_MODEL || "qwen/qwen3-vl-30b-a3b-instruct",
+    model: "auto",
+    plan: accountPlan(user.app_metadata),
+    premiumEnabled: false,
+    plannedProOffer: PRO_OFFER,
     provider,
     isAdmin: isCoreAdminId(user.id),
     accountId: user.id,

@@ -174,7 +174,7 @@ export const DEFAULT_PREFS: Prefs = {
   tone: "natural",
   thinkingMode: "balanced",
   temperature: 0.7,
-  model: "",
+  model: "auto",
   theme: "dark",
   voiceResponses: false,
   systemPrompt: "",

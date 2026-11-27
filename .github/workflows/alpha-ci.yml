@@ -1,7 +1,7 @@
 name: NEXUS Release CI
 on:
   push:
-    branches: ["feature/nexus-3.3-alpha1", "feature/nexus-4.0"]
+    branches: ["feature/nexus-3.3-alpha1", "feature/nexus-4.0", "feature/nexus-5.0"]
   pull_request:
     branches: ["main"]
 permissions:

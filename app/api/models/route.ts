@@ -1,3 +1,4 @@
+import { parsePrice } from "../../../lib/core/model-policy";
 import { NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 
@@ -16,7 +17,7 @@ type RawModel = {
     output_modalities?: string[];
   };
   supported_parameters?: string[];
-  pricing?: { prompt?: string; completion?: string };
+  pricing?: { prompt?: string; completion?: string; request?: string; image?: string };
 };
 
 const VISION_ID_RE =
@@ -80,12 +81,9 @@ export async function GET() {
       .map((m: RawModel) => {
         const id = m.id!;
         const modalities = m.architecture?.input_modalities || [];
-        const vision = modalities.includes("image") || VISION_ID_RE.test(id);
-        const isFree =
-          id.endsWith(":free") ||
-          (m.pricing?.prompt !== undefined &&
-            Number(m.pricing.prompt) === 0 &&
-            Number(m.pricing.completion || 0) === 0);
+        const vision = modalities.includes("image");
+        const isFree = !id.startsWith("openrouter/") &&
+          [m.pricing?.prompt,m.pricing?.completion,m.pricing?.request??"0",m.pricing?.image??"0"].every(p=>parsePrice(p)===0);
 
         return {
           id,
@@ -99,6 +97,7 @@ export async function GET() {
           supportedParameters: Array.isArray(m.supported_parameters) ? m.supported_parameters : [],
         };
       })
+      .filter(m=>m.free)
       .sort(
         (a: any, b: any) =>
           Number(b.free) - Number(a.free) ||
