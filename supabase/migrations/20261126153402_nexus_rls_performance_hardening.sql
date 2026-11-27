@@ -1,0 +1,18 @@
+begin;
+drop policy "Users can create their own chats" on public.nexus_chats;
+drop policy "Users can delete their own chats" on public.nexus_chats;
+drop policy "Users can update their own chats" on public.nexus_chats;
+drop policy "Users can view their own chats" on public.nexus_chats;
+alter policy "Users can insert own chats" on public.nexus_chats to authenticated with check ((select auth.uid()) = user_id);
+alter policy "Users can delete own chats" on public.nexus_chats to authenticated using ((select auth.uid()) = user_id);
+alter policy "Users can update own chats" on public.nexus_chats to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+alter policy "Users can view own chats" on public.nexus_chats to authenticated using ((select auth.uid()) = user_id);
+alter policy "Users can insert own settings" on public.nexus_user_settings to authenticated with check ((select auth.uid()) = user_id);
+alter policy "Users can update own settings" on public.nexus_user_settings to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+alter policy "Users can view own settings" on public.nexus_user_settings to authenticated using ((select auth.uid()) = user_id);
+alter policy nexus_gem_docs_own_all on public.nexus_gem_docs to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+alter policy nexus_usage_logs_own_all on public.nexus_usage_logs to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+alter policy nexus_shares_owner_write on public.nexus_shares to authenticated with check ((select auth.uid()) = user_id);
+alter policy nexus_shares_owner_delete on public.nexus_shares to authenticated using ((select auth.uid()) = user_id);
+create index if not exists nexus_shares_user_id_idx on public.nexus_shares(user_id);
+commit;
