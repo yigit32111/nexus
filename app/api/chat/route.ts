@@ -1,5 +1,4 @@
 import {readJsonLimited} from "../../../lib/core/request-guard";
-import {reportTechnicalEvent} from "../../../lib/core/technical-monitor";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { writeUsageLog } from "../../../utils/supabase/admin";
@@ -163,7 +162,7 @@ export async function POST(req: NextRequest) {
             )}`
           );
         } catch (error) {
-          console.error("NEXUS PDF ERROR");
+          console.error("NEXUS PDF ERROR", error);
           return fail(`PDF okunamadı: ${file.name}`, 422);
         }
       } else if (file.type === "text/plain") {
@@ -384,7 +383,6 @@ export async function POST(req: NextRequest) {
           {status:429,headers:{"Cache-Control":"no-store",...(wait ? {"Retry-After":wait} : {})}}
         );
       }
-      if(response.status>=500)await reportTechnicalEvent("CHAT_PROVIDER_FAILURE");
       const message = response.status === 401
         ? "AI sağlayıcısına bağlanılamadı."
         : response.status === 402
@@ -524,10 +522,8 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("NEXUS CHAT ERROR");
     if (error?.name === "TimeoutError" || error?.name === "AbortError") {
-      if(error?.name==="TimeoutError")await reportTechnicalEvent("CHAT_TIMEOUT");
       return fail("İstek zaman aşımına uğradı.", 504);
     }
-    await reportTechnicalEvent("CHAT_INTERNAL");
     return fail("Beklenmeyen sunucu hatası oluştu.", 500);
   }
 }

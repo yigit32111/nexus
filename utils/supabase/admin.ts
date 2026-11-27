@@ -1,6 +1,5 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
-import { reportTechnicalEvent } from "../../lib/core/technical-monitor";
 
 export function createAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -17,9 +16,8 @@ export async function writeUsageLog(row: {
 }) {
   try {
     const { error } = await createAdminClient().from("nexus_usage_logs").insert(row);
-    if (error) { console.error("NEXUS USAGE LOG ERROR"); await reportTechnicalEvent("USAGE_LOG_FAILURE"); }
+    if (error) console.error("NEXUS USAGE LOG ERROR", error.code);
   } catch {
     console.error("NEXUS USAGE LOG ERROR: server credentials or connection unavailable");
-    await reportTechnicalEvent("USAGE_LOG_FAILURE");
   }
 }
