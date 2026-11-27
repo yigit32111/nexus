@@ -104,6 +104,7 @@ export type Prefs = {
   memoryMode: "hybrid" | "manual" | "off";
   autoMemoryExtract: boolean;
   historyRecall: boolean;
+  smartContext?: boolean;
   style: "balanced" | "concise" | "detailed";
   tone: "natural" | "friendly" | "professional";
   thinkingMode: "fast" | "balanced" | "deep";
@@ -171,6 +172,7 @@ export const DEFAULT_PREFS: Prefs = {
   memoryMode: "hybrid",
   autoMemoryExtract: true,
   historyRecall: false,
+  smartContext: true,
   style: "balanced",
   tone: "natural",
   thinkingMode: "balanced",
