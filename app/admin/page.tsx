@@ -3,6 +3,7 @@ import {notFound} from "next/navigation";
 import {BILLING_RELEASE,PRO_OFFER} from "../../lib/core/plans";
 import {getCoreAdmin} from "../../lib/core/permissions";
 import {createAdminClient} from "../../utils/supabase/admin";
+import {SentryTestPanel} from "./SentryTestPanel";
 export const dynamic="force-dynamic";
 export default async function AdminPage(){
   if(!await getCoreAdmin())notFound();
@@ -39,6 +40,7 @@ export default async function AdminPage(){
     <p>Bugünkü kullanım logları: {logs.count??0}</p>
     <p>Genel istek kotası: {sum("requests") >= Number(cfg.global_requests) ? "Doldu" : "Kullanılabilir"}</p>
     <h2>Kullanıcı limitleri</h2><p>İstek: {cfg.user_requests} · Tahmini bütçe: {usd(Number(cfg.user_budget_microusd))}</p>
+    <h2>Sistem sağlık takibi</h2><SentryTestPanel/>
     <h2>Üyelik ve ödeme durumu</h2><p>Yönetici Pro önizlemesi: açık · diğer hesapların erişimi: Free. Eski hesap etiketleri ücretli erişim sağlamaz.</p><p>Ücretli AI: {BILLING_RELEASE.premiumEnabled?"Açık":"Kapalı"}</p>
     <p>Ödeme: {BILLING_RELEASE.paymentsEnabled?"Açık":"Kapalı"} · hedef {BILLING_RELEASE.targetMajor}.0</p>
     <p>Planlanan Pro: {PRO_OFFER.priceTry} TL/ay · {PRO_OFFER.monthlyBudgetMicrousd/1e6} USD ortak bütçe. Gerçek cüzdan kurulmadı.</p>
