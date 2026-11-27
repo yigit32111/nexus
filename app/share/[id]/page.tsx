@@ -34,7 +34,7 @@ export default async function SharedPage({
       <header className="share-topbar">
         <div className="share-brand">
           <Sparkles size={18} />
-          <b>NEXUS AI 5.1</b>
+          <b>NEXUS AI 5.1.2</b>
           <span>· Paylaşılan Çalışma</span>
         </div>
         <Link href="/" className="done-button" style={{ textDecoration: "none" }}>

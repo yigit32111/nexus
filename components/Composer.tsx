@@ -3,8 +3,8 @@
 import { RefObject } from "react";
 import {
   Code2,
+  Brain,
   FileText,
-  Globe,
   Image as ImageIcon,
   LockKeyhole,
   Mic,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { UploadAttachment } from "../types/nexus";
 import { bytesLabel } from "../lib/nexus-utils";
+import { ChatResearch } from "./ChatResearch";
 
 type ComposerProps = {
   input: string;
@@ -35,8 +36,8 @@ type ComposerProps = {
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   isRecording: boolean;
   onToggleDictate: () => void;
-  webSearch: boolean;
-  onToggleWebSearch: () => void;
+  deepThinking: boolean;
+  onToggleDeepThinking: () => void;
   codeExecution: boolean;
   onToggleCodeExecution: () => void;
   onOpenLiveVoice: () => void;
@@ -62,8 +63,8 @@ export function Composer({
   textareaRef,
   isRecording,
   onToggleDictate,
-  webSearch,
-  onToggleWebSearch,
+  deepThinking,
+  onToggleDeepThinking,
   codeExecution,
   onToggleCodeExecution,
   onOpenLiveVoice,
@@ -133,7 +134,7 @@ export function Composer({
           onChange={(e) => onInputChange(e.target.value)}
           onPaste={handlePaste}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               onSubmit();
             }
@@ -176,16 +177,6 @@ export function Composer({
               title="NEXUS Live — Tam ekran eller serbest sesli sohbet"
             >
               <Radio size={17} />
-            </button>
-
-            <button
-              type="button"
-              className={`composer-tool-toggle ${webSearch ? "active" : ""}`}
-              onClick={onToggleWebSearch}
-              title="Ücretsiz araştırma çalışma alanını aç"
-            >
-              <Globe size={15} />
-              <span>Araştırma</span>
             </button>
 
             {isGroqProvider && (
@@ -237,6 +228,13 @@ export function Composer({
               </button>
             )}
           </div>
+        </div>
+        <div className="composer-modes">
+          <ChatResearch draft={input} disabled={busy} />
+          <button type="button" className="composer-tool-toggle" aria-pressed={deepThinking}
+            disabled={busy} onClick={onToggleDeepThinking}>
+            <Brain size={15} aria-hidden="true" /> Derin düşünme
+          </button>
         </div>
       </div>
 

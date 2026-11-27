@@ -22,8 +22,8 @@ test("retired image route has no provider integration",()=>{
 test("release manifest and package lock versions match",()=>{
  const pkg=JSON.parse(read("package.json")),lock=JSON.parse(read("package-lock.json"));
  const manifest=JSON.parse(read("public/manifest.webmanifest"));
- assert.equal(pkg.version,"5.1.0");
+ assert.equal(pkg.version,"5.1.2");
  assert.equal(lock.version,pkg.version);
  assert.equal(lock.packages[""].version,pkg.version);
- assert.equal(manifest.name,`NEXUS AI ${pkg.version.split(".").slice(0,2).join(".")}`);
+ assert.equal(manifest.name,`NEXUS AI ${pkg.version}`);
 });
