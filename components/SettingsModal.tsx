@@ -625,6 +625,7 @@ export function SettingsModal({
                 <div className="system-info-row"><span>Planlanan ortak API bütçesi</span><b>{PRO_OFFER.monthlyBudgetMicrousd/1e6} USD / ay</b></div>
                 <p className="settings-description">GPT-5.6 Luna ve Claude Haiku 5.5 planlanıyor. Bu bir önizleme: ödeme alınmaz, gerçek kredi bakiyesi gösterilmez ve premium erişim verilmez.</p>
                 <div className="account-actions">
+                  <button type="button" onClick={()=>window.location.assign("/plans")}> <ShieldCheck size={15}/> Üyelik ve ödeme önizlemesi</button>
                   <button type="button" onClick={onExportAll}>
                     <Download size={15} /> Tüm verilerimi yedekle (.json)
                   </button>

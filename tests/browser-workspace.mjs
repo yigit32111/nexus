@@ -100,6 +100,9 @@ try {
   assert.equal(await page.getByText("399 TL / ay",{exact:true}).count(),1);
   await page.getByText("Premium model erişimi",{exact:true}).waitFor();
   await page.getByText("Kapalı",{exact:true}).waitFor();
+  await page.getByRole("button",{name:"Üyelik ve ödeme önizlemesi"}).click();
+  await page.getByRole("heading",{name:"Üyelik planları"}).waitFor();
+  assert.equal(new URL(page.url()).pathname,"/plans");
   console.log("OK planned subscription UI: premium access remains disabled");
 } finally {
   await browser.close();
