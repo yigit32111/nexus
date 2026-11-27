@@ -649,7 +649,7 @@ export function SettingsModal({
                 </div>
 
                 {[
-                  ["Uygulama sürümü", "NEXUS AI 5.1"],
+                  ["Uygulama sürümü", "NEXUS AI 5.1.2"],
                   ["Hesap oturumu", "Aktif"],
                   ["Hafıza kayıtları", String(prefs.memoryItems.length)],
                   ["Özel Gem sayısı", String(prefs.gems.length)],

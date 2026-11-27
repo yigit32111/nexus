@@ -144,6 +144,17 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
+    let verifiedAccountId: string | undefined;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled || event === "INITIAL_SESSION") return;
+      if (event !== "SIGNED_OUT" && (!verifiedAccountId || session?.user.id === verifiedAccountId)) return;
+      cancelled = true;
+      abortRef.current?.abort();
+      setLoading(true);
+      setUserId("");
+      setChats([]);
+      window.location.replace(session ? "/" : "/login");
+    });
     async function init() {
       const { data, error } = await supabase.auth.getUser();
       if (cancelled) return;
@@ -153,13 +164,14 @@ export default function Home() {
         return;
       }
       const id = data.user.id;
+      verifiedAccountId = id;
       setUserId(id);
       setEmail(data.user.email || "");
       setSyncStatus("Bulut verileri yükleniyor");
 
       const cloudChatResult = await supabase
         .from("nexus_chats")
-        .select("id,title,messages,updated_at,pinned,archived,project_id")
+        .select("id,user_id,title,messages,updated_at,pinned,archived,project_id")
         .eq("user_id", id)
         .order("updated_at", { ascending: false });
       if (cancelled) return;
@@ -187,7 +199,7 @@ export default function Home() {
       let loadedChats: Chat[] = [];
       if (!cloudChatResult.error && Array.isArray(cloudChatResult.data) && cloudChatResult.data.length) {
         const localGemMap = new Map(localChats.map((lc) => [lc.id, lc.gemId]));
-        loadedChats = cloudChatResult.data.map((r: any) => ({
+        loadedChats = cloudChatResult.data.filter(row => row.user_id === id).map((r: any) => ({
           id: String(r.id),
           title: String(r.title || "Yeni sohbet"),
           messages: safeMessageList(r.messages),
@@ -269,9 +281,12 @@ export default function Home() {
       setLoading(false);
     }
 
-    init().catch(() => setLoading(false));
+    init().catch(() => {
+      if (!cancelled) setLoading(false);
+    });
     return () => {
       cancelled = true;
+      subscription.unsubscribe();
     };
   }, [router, supabase]);
 
@@ -970,8 +985,11 @@ export default function Home() {
             textareaRef={textareaRef}
             isRecording={isRecording}
             onToggleDictate={toggleDictate}
-            webSearch={false}
-            onToggleWebSearch={() => window.location.assign("/workspace")}
+            deepThinking={prefs.thinkingMode === "deep"}
+            onToggleDeepThinking={() => setPrefs((p) => ({
+              ...p,
+              thinkingMode: p.thinkingMode === "deep" ? "balanced" : "deep",
+            }))}
             codeExecution={prefs.codeExecution}
             onToggleCodeExecution={() =>
               setPrefs((p) => ({ ...p, codeExecution: !p.codeExecution }))
@@ -1048,7 +1066,7 @@ export default function Home() {
           email={email}
           importRef={importRef}
           onExportAll={() => {
-            const backup = { app: "NEXUS AI", version: "5.1.0", chats, prefs };
+            const backup = { app: "NEXUS AI", version: "5.1.2", accountId: userId, chats, prefs };
             const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -1059,10 +1077,17 @@ export default function Home() {
           }}
           onImportBackup={async (file) => {
             if (!file) return;
-            const parsed = JSON.parse(await file.text());
-            if (Array.isArray(parsed?.chats)) {
+            try {
+              const parsed = JSON.parse(await file.text());
+              if (parsed?.accountId && parsed.accountId !== userId) {
+                setNotice("Bu yedek başka bir hesaba ait.");
+                return;
+              }
+              if (!Array.isArray(parsed?.chats)) throw new Error();
               setChats((prev) => [...parsed.chats, ...prev]);
               setNotice("Yedek içe aktarıldı.");
+            } catch {
+              setNotice("Sohbet yedeği okunamadı.");
             }
           }}
           onClearAllChats={async () => {

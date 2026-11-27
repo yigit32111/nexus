@@ -55,14 +55,20 @@ try {
   await page.getByLabel("Sayısal kod").fill("print(6*7)");
   await page.getByRole("button", { name: "Çalıştır", exact: true }).click();
   assert.equal(await page.locator("pre[aria-live]").textContent(), "42");
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Çıktıyı indir" }).click();
+  assert.equal((await downloadEvent).suggestedFilename(), "nexus-kod-ciktisi.txt");
+  await page.getByRole("button", { name: "Dosyaya aktar" }).click();
+  assert.equal(await page.getByLabel("Dosya içeriği").inputValue(), "42");
   console.log("OK workspace browser: comparison, synthesis, artifact transfer, agent approval, Code Lab");
 
   const home = await readFile(".next/server/app/index.html", "utf8");
   await page.route(base + "/", route => route.fulfill({contentType:"text/html",body:home}));
   const chats = ["visible", "archived"].map((id, index) => ({
-    id, title:id, archived: Boolean(index), updated_at:new Date().toISOString(),
+    id, user_id:user.id, title:id, archived: Boolean(index), updated_at:new Date().toISOString(),
     messages:[{id,role:"user",content:"fixture-" + id,createdAt:1}],
   }));
+  chats.push({ ...chats[0], id:"foreign", user_id:"00000000-0000-4000-8000-000000000002", title:"foreign-chat-marker" });
   await page.route("**/rest/v1/nexus_chats*", route => route.fulfill({
     json: route.request().method() === "GET" ? chats : [],
   }));
@@ -77,11 +83,25 @@ try {
   await page.goto(base + "/");
   try {
     await page.locator(".nexus-splash img").waitFor({state:"visible"});
-    await page.getByText("5.1",{exact:true}).waitFor();
+    await page.getByText("5.1.2",{exact:true}).waitFor();
     assert.equal(await page.locator(".nexus-splash img").getAttribute("src"),"/icon.svg");
     console.log("OK branded loading state");
   } finally { releaseStatus(); }
   await page.getByText("fixture-visible", {exact:true}).waitFor();
+  assert.equal(await page.getByText("foreign-chat-marker", {exact:true}).count(), 0);
+  const deep = page.getByRole("button", { name: "Derin düşünme" });
+  await deep.click();
+  assert.equal(await deep.getAttribute("aria-pressed"), "true");
+  await deep.click();
+  await page.route(base + "/api/research", route => route.fulfill({json:{
+    sources:[{title:"Örnek kaynak",text:"Kaynak özeti",url:"https://tr.wikipedia.org/?curid=1"}],
+    coverage:"Örnek kapsam",unavailable:[],
+  }}));
+  await page.getByRole("button", {name:"Araştırma", exact:true}).click();
+  await page.getByLabel("Araştırma konusu").fill("Örnek konu");
+  await page.getByRole("button", {name:"Kaynakları ara"}).click();
+  await page.getByRole("link", {name:"Örnek kaynak"}).waitFor();
+  await page.getByRole("button", {name:"Kapat",exact:true}).click();
   const modelPicker = page.getByRole("button", { name: /^Model seç:/ });
   for (const width of [1280, 320]) {
     await page.setViewportSize({ width, height: 740 });
@@ -160,6 +180,14 @@ try {
   }
   assert.equal(prompts.length,beforeOwner);
   console.log("OK owner Pro preview: both model placeholders disabled, no chat request");
+  await page.evaluate(() => {
+    const channel = new BroadcastChannel("sb-example-auth-token");
+    channel.postMessage({ event: "SIGNED_OUT", session: null });
+    channel.close();
+  });
+  await page.waitForURL(base + "/login");
+  assert.equal(await page.getByText("fixture-visible", {exact:true}).count(), 0);
+  console.log("OK cross-tab sign-out hides the previous account");
 
 } finally {
   await browser.close();
