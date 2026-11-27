@@ -1059,7 +1059,7 @@ export default function Home() {
           email={email}
           importRef={importRef}
           onExportAll={() => {
-            const backup = { app: "NEXUS AI", version: "3.2.0", chats, prefs };
+            const backup = { app: "NEXUS AI", version: "5.0.0-rc.1", chats, prefs };
             const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");

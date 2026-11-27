@@ -1,6 +1,6 @@
-# NEXUS AI 5.0 Alpha
+# NEXUS AI 5.0 RC1
 
-NEXUS, Türkçe sohbet, kaynaklı araştırma, belge üretimi ve sesli konuşmayı aynı hesapta bir araya getiren bir yapay zekâ çalışma alanıdır. Bu geliştirme dalı **5.0.0-alpha.1** sürümünü içerir; canlı yayın 4.0.0 olarak korunmaktadır. Destek kapsamı ve doğrulama koşulları için [4.0.0 yayın notlarına](docs/4.0.0-release.md) bak. [NEXUS’u aç](https://nexus-ifn5.onrender.com) · [Güncel kaynak kodunu ZIP olarak indir](https://github.com/yigit32111/nexus/archive/refs/heads/main.zip)
+NEXUS, Türkçe sohbet, kaynaklı araştırma, belge üretimi ve sesli konuşmayı aynı hesapta bir araya getiren bir yapay zekâ çalışma alanıdır. Bu geliştirme dalı **5.0.0-rc.1** sürümünü içerir; canlı yayın 4.0.0 olarak korunmaktadır. Destek kapsamı ve doğrulama koşulları için [5.0 RC1 yayın notlarına](docs/5.0-rc1.md) bak. [NEXUS’u aç](https://nexus-ifn5.onrender.com) · [5.0 geliştirme dalı](https://github.com/yigit32111/nexus/pull/11)
 
 ## Nereden başlanır?
 
@@ -75,7 +75,7 @@ Tarayıcıda `http://localhost:3000` adresini aç. Üretim için önce `npm run 
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Tarayıcı için yayımlanabilir anahtar. Eski projelerde `NEXT_PUBLIC_SUPABASE_ANON_KEY` kullanılabilir. |
 | `SUPABASE_SECRET_KEY` | Sunucuda kota, kullanım ve yetkili veri işlemleri. Eski anahtar için `SUPABASE_SERVICE_ROLE_KEY` desteklenir. |
 | `AI_API_KEY` | OpenRouter sunucu anahtarı |
-| `AI_BASE_URL`, `AI_MODEL` | İsteğe bağlı sağlayıcı adresi ve varsayılan model. 4.0 sohbet yönlendiricisi OpenRouter kataloğunu kullanır. Varsayılan adres `https://openrouter.ai/api/v1` değeridir. |
+| `AI_BASE_URL`, `AI_MODEL` | İsteğe bağlı sağlayıcı adresi ve varsayılan model. 5.0 yalnızca doğrulanmış ücretsiz OpenRouter modellerini kullanır; AI_MODEL, Auto için ikincil öncelik ipucudur. Varsayılan adres `https://openrouter.ai/api/v1` değeridir. |
 | `NEXUS_ADMIN_USER_ID` | Yönetim paneline erişecek Supabase kullanıcısının UUID değeri |
 | `NEXT_PUBLIC_APP_URL` | Paylaşım bağlantıları için uygulamanın dışarıdan erişilen adresi |
 
