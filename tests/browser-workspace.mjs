@@ -95,6 +95,36 @@ try {
   assert.equal(await page.getByRole("button",{name:/Görsel üret/}).count(),0);
   await page.getByRole("button",{name:/Fikir geliştir/}).waitFor();
   console.log("OK warm new-chat welcome and supported starters");
+  await page.getByTitle("Ayarlar",{exact:true}).click();
+  await page.getByRole("button",{name:"Lavanta",exact:true}).click();
+  await page.getByRole("button",{name:"Kompakt",exact:true}).click();
+  await page.getByLabel("Azaltılmış animasyon").check();
+  await page.waitForFunction(()=>document.querySelector(".nexus-app")?.getAttribute("data-accent")==="lavender"&&document.querySelector(".nexus-app")?.getAttribute("data-density")==="compact"&&document.querySelector(".nexus-app")?.getAttribute("data-motion")==="reduced");
+  await page.getByRole("button",{name:"Ayarları kapat"}).click();
+  assert.equal(await page.locator(".nexus-app").evaluate(el=>getComputedStyle(el).getPropertyValue("--accent").trim()),"#c7b5ff");
+  await page.getByTitle("Model seç",{exact:true}).click();
+  await page.getByRole("region",{name:"Model seçimi"}).waitFor();
+  assert.equal(await page.locator(".model-option").filter({has:page.getByText("NEXUS Auto",{exact:true})}).count(),1);
+  await page.getByLabel("Model ara",{exact:true}).press("Escape");
+  await page.getByRole("region",{name:"Model seçimi"}).waitFor({state:"detached"});
+  assert.equal(await page.getByTitle("Model seç",{exact:true}).getAttribute("aria-expanded"),"false");
+  const viewport=page.viewportSize();
+  for(const width of [390,320]){
+    await page.setViewportSize({width,height:844});
+    await page.getByTitle("Model seç",{exact:true}).click();
+    await page.getByRole("region",{name:"Model seçimi"}).waitFor();
+    const pop=await page.locator(".model-popover").boundingBox();
+    assert.ok(pop&&pop.x>=0&&pop.x+pop.width<=width+1,"model picker fits narrow viewport");
+    await page.getByLabel("Model ara",{exact:true}).press("Escape");
+    await page.getByLabel("NEXUS’a mesaj yaz").fill("Deneme metni");
+    const send=await page.getByTitle("Gönder",{exact:true}).boundingBox();
+    assert.ok(send&&send.x>=0&&send.x+send.width<=width+1,"send button fits narrow viewport");
+    assert.equal(await page.getByTitle("Ayarlar",{exact:true}).isVisible(),true);
+  }
+  await page.setViewportSize(viewport);
+  await page.getByLabel("NEXUS’a mesaj yaz").fill("");
+  console.log("OK 5.2 appearance controls, keyboard model picker and 390/320px chat layout");
+
   await page.evaluate(() => {
     window.SpeechRecognition=class {
       start(){ window.testRecognizer=this;this.onstart?.(); }
