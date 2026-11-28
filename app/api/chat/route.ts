@@ -6,7 +6,7 @@ import { selectPdfContext, type PdfText } from "../../../lib/core/pdf-context";
 import { fetchUntilHeaders, retryCompletion } from "../../../lib/core/provider-timeout";
 import { chatResearchQuery, formatChatResearch, searchChatWeb } from "../../../lib/core/chat-web-research";
 import { localChatResponse } from "../../../lib/core/local-chat-response";
-import { asksForCurrentFenerbahceSquad, readFenerbahceSquadResponse } from "../../../lib/core/fenerbahce-squad";
+import { currentUefaSquadClub, readUefaSquadResponse } from "../../../lib/core/uefa-squad";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { writeUsageLog } from "../../../utils/supabase/admin";
@@ -135,9 +135,10 @@ export async function POST(req: NextRequest) {
       return developerCreditResponse(body.stream !== false);
     }
     if (!attachments.length && body.comparison !== true) {
-      if (asksForCurrentFenerbahceSquad(latestUserQuery) && lastUserIndex === messages.length - 1) {
+      const squadClub = currentUefaSquadClub(latestUserQuery);
+      if (squadClub && lastUserIndex === messages.length - 1) {
         if (!await reserveRequest(user.id, "chat", 0)) return fail("Günlük araştırma kotası doldu.", 429);
-        return localChatResponse(await readFenerbahceSquadResponse(req.signal), body.stream !== false);
+        return localChatResponse(await readUefaSquadResponse(squadClub, req.signal), body.stream !== false);
       }
       const query = chatResearchQuery(messages);
       if (query !== null) {

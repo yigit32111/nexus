@@ -14,9 +14,9 @@ export const FREE_MODELS = Object.freeze({
 export function modelPriority(query:string,images:number): readonly string[] {
  const normalized=query.toLocaleLowerCase("tr-TR");
  if(images>0)return [FREE_MODELS.vision,FREE_MODELS.fallback];
+ if(/\b2026\b/u.test(normalized))return [FREE_MODELS.recentCode];
  if(/\b(kod|code|python|typescript|javascript|debug|programla|programlama|yazılım)\b/u.test(normalized))return [FREE_MODELS.code,FREE_MODELS.recentCode,FREE_MODELS.reasoning,FREE_MODELS.chat,FREE_MODELS.fallback];
  if(/\b(matematik|ispat|denklem|analiz|reasoning|math)\b/u.test(normalized))return [FREE_MODELS.reasoning,FREE_MODELS.chat,FREE_MODELS.fallback];
- if(/\b2026\b/u.test(normalized))return [FREE_MODELS.recentCode,FREE_MODELS.chat,FREE_MODELS.reasoning,FREE_MODELS.fallback];
  return [FREE_MODELS.chat,FREE_MODELS.fallback,FREE_MODELS.reasoning,FREE_MODELS.code,FREE_MODELS.recentCode];
 }
 export function accountPlan(appMetadata:unknown):"free"|"pro" {
