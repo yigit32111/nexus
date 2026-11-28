@@ -6,6 +6,7 @@ import { selectPdfContext, type PdfText } from "../../../lib/core/pdf-context";
 import { fetchUntilHeaders, retryCompletion } from "../../../lib/core/provider-timeout";
 import { chatResearchQuery, formatChatResearch, searchChatWeb } from "../../../lib/core/chat-web-research";
 import { localChatResponse } from "../../../lib/core/local-chat-response";
+import { asksForCurrentFenerbahceSquad, readFenerbahceSquadResponse } from "../../../lib/core/fenerbahce-squad";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { writeUsageLog } from "../../../utils/supabase/admin";
@@ -134,6 +135,10 @@ export async function POST(req: NextRequest) {
       return developerCreditResponse(body.stream !== false);
     }
     if (!attachments.length && body.comparison !== true) {
+      if (asksForCurrentFenerbahceSquad(latestUserQuery) && lastUserIndex === messages.length - 1) {
+        if (!await reserveRequest(user.id, "chat", 0)) return fail("Günlük araştırma kotası doldu.", 429);
+        return localChatResponse(await readFenerbahceSquadResponse(req.signal), body.stream !== false);
+      }
       const query = chatResearchQuery(messages);
       if (query !== null) {
         if (!query) return localChatResponse("Webde aramam için kişisel bilgi içermeyen kısa bir konu yaz.", body.stream !== false);
@@ -319,7 +324,9 @@ export async function POST(req: NextRequest) {
     const useWebSearch = !comparison && preferences.webSearch === true;
     if(useWebSearch)return fail("Ücretli sağlayıcı web araması bu önizlemede kapalı. Ücretsiz araştırma için çalışma alanını kullan.",403);
     const profile = thinkingProfile(preferences.thinkingMode);
-    const completionSystem = system + "\nGeliştirici bilgisi: " + DEVELOPER_CREDIT + profile.instruction;
+    const completionSystem = system + "\nGeliştirici bilgisi: " + DEVELOPER_CREDIT +
+      "\nGüncel kadro, skor, fikstür ve transfer iddialarını doğrulanmış kaynak olmadan kesinleştirme. Elindeki bağlam yetmiyorsa doğrulama eksikliğini belirt." +
+      profile.instruction;
     const useCodeExecution = preferences.codeExecution === true;
 
     // Core routing uses server-verified provider metadata.

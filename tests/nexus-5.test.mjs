@@ -11,6 +11,13 @@ test("Auto 3 priorities by task, with catalog capability checks",()=>{
 test("Auto never selects a priority model if it is paid",()=>{
  assert.equal(chooseModel([mk(FREE_MODELS.chat,{request:.1}),mk(FREE_MODELS.fallback)],"auto","","merhaba",0,100).id,FREE_MODELS.fallback);
 });
+test("Auto may prefer the 2026 model only when the free catalog lists it",()=>{
+ const fresh = mk(FREE_MODELS.recentCode);
+ const standard = mk(FREE_MODELS.chat);
+ assert.equal(chooseModel([fresh, standard],"auto","","2026 hakkında bilgi",0,100).id, fresh.id);
+ assert.equal(chooseModel([standard],"auto","","2026 hakkında bilgi",0,100).id, standard.id);
+ assert.equal(chooseModel([{...fresh,prompt:0.001},standard],"auto","","2026 hakkında bilgi",0,100).id, standard.id);
+});
 test("planned Pro limit is shared and rejects invalid amounts",()=>{
  assert.equal(PRO_MODELS.length,2);assert.equal(PRO_OFFER.monthlyBudgetMicrousd,5_000_000);
  assert.equal(canReservePro(2_000_000,2_000_000,1_000_000),true);
