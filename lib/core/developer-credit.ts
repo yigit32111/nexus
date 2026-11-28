@@ -1,5 +1,5 @@
 export const DEVELOPER_CREDIT =
-  "NEXUS AI’ın ana geliştiricisi Yiğit Yumak, yardımcı geliştiricisi İsmet Berat Karakülahta’dır.";
+  "NEXUS AI’ın ana geliştiricisi Yiğit Yumak, yardımcı geliştiricisi İsmet Berat Karakülah.";
 
 export function asksForDeveloper(question: string): boolean {
   const text = question.normalize("NFC").toLocaleLowerCase("tr-TR")

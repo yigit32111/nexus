@@ -6,6 +6,7 @@ import { fetchUntilHeaders, retryCompletion } from "../lib/core/provider-timeout
 import { PRO_MODELS, accountPlan } from "../lib/core/plans.ts";
 
 test("developer credit uses the chat streaming protocol and the JSON reply", async () => {
+  assert.equal(DEVELOPER_CREDIT, "NEXUS AI’ın ana geliştiricisi Yiğit Yumak, yardımcı geliştiricisi İsmet Berat Karakülah.");
   assert.equal(asksForDeveloper("Seni kim geliştirdi?"), true);
   assert.equal(asksForDeveloper("Selam, NEXUS AI’ı kim geliştirdi?"), true);
   assert.equal(asksForDeveloper("Yapay zekâ nasıl geliştirilir?"), false);
