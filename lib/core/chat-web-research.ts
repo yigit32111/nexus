@@ -63,6 +63,30 @@ function readIndexRows(value: unknown, max: number): SearchResult[] {
   });
 }
 
+const LIVERPOOL_ORIGIN = "https://www.liverpoolfc.com";
+
+export function readLiverpoolArchive(html: string, query: string): SearchResult[] {
+  const matches: SearchResult[] = [];
+  const cards = html.matchAll(/<article\b[^>]{0,512}\bdata-testid="fixture-card-slotted"[^>]{0,512}>([\s\S]{1,24000}?)<\/article>/g);
+  for (const [, card] of cards) {
+    const match = card.match(/href="(\/matches\/mens-team\/([a-z0-9-]+)-v-([a-z0-9-]+)-(uefa-champions-league|premier-league|fa-cup|carabao-cup)-(\d{4})(\d{2})(\d{2}))"/);
+    if (!match) continue;
+    const [, path, home, away, competition, year, month, day] = match;
+    if (home !== "liverpool" && away !== "liverpool") continue;
+    const homeName = home.replaceAll("-", " ");
+    const awayName = away.replaceAll("-", " ");
+    const scores = [...card.matchAll(/<span\b[^>]{0,500}class="[^"]{0,300}__score__[^"]{0,300}"[^>]{0,300}>\s*(\d{1,2})\s*<\/span>/g)];
+    const score = scores.length === 2 ? ` ${scores[0][1]}-${scores[1][1]} ` : " – ";
+    const label = competition === "uefa-champions-league" ? "UEFA Şampiyonlar Ligi" : competition.replaceAll("-", " ");
+    matches.push({
+      title: `${homeName}${score}${awayName}`,
+      url: LIVERPOOL_ORIGIN + path,
+      excerpt: `${day}.${month}.${year} · ${label} · Liverpool FC resmî maç arşivi`,
+    });
+  }
+  return rankResearchResults(matches, query);
+}
+
 export function rankResearchResults(results: readonly SearchResult[], query: string): SearchResult[] {
   const tokens = [...new Set(topicTerms(query).map(normalize).filter(token => /\p{L}/u.test(token)))];
   const ranked = results.flatMap(result => {
@@ -113,6 +137,34 @@ export async function searchChatWeb(query: string, requestSignal: AbortSignal, f
         excerpt: typeof row.extract === "string" ? row.extract.slice(0, 300) : undefined }];
     });
   };
+  const terms = topicTerms(query).map(normalize);
+  if (terms.includes("liverpool") && terms.filter(term => /\p{L}/u.test(term)).length >= 2) {
+    const year = terms.find(term => /^20[0-9]{2}$/.test(term)) ?? String(new Date().getUTCFullYear());
+    const official = await (async () => {
+      const response = await fetcher(`${LIVERPOOL_ORIGIN}/matches/mens-team/results/${year}`, {
+        signal: AbortSignal.any([signal, AbortSignal.timeout(4000)]), headers, redirect: "error", cache: "no-store",
+      });
+      if (!response.ok || !response.body) return [];
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let bytes = 0;
+      let html = "";
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          bytes += value.byteLength;
+          if (bytes > 2_000_000) return [];
+          html += decoder.decode(value, { stream: true });
+        }
+        return readLiverpoolArchive(html + decoder.decode(), query);
+      } finally {
+        await reader.cancel().catch(() => {});
+        reader.releaseLock();
+      }
+    })().catch(() => []);
+    if (official.length) return official;
+  }
   const tasks = [news(), wiki("tr"), wiki("en")];
   const key = process.env.BRAVE_SEARCH_API_KEY?.trim();
   if (key) {

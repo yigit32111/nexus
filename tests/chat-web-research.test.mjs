@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chatResearchQuery, formatChatResearch, rankResearchResults, searchChatWeb } from "../lib/core/chat-web-research.ts";
+import { chatResearchQuery, formatChatResearch, rankResearchResults, readLiverpoolArchive, searchChatWeb } from "../lib/core/chat-web-research.ts";
 
 test("explicit web requests resolve short follow-ups from user turns only", () => {
   const messages = [
@@ -39,7 +39,7 @@ test("automatic research returns trusted live-index results without visiting res
   const results = await searchChatWeb("Fenerbahçe Liverpool", new AbortController().signal, async input => {
     const url = new URL(input);
     urls.push(url);
-    assert.ok(["api.gdeltproject.org", "tr.wikipedia.org", "en.wikipedia.org", "api.search.brave.com"].includes(url.hostname));
+    assert.ok(["api.gdeltproject.org", "tr.wikipedia.org", "en.wikipedia.org", "api.search.brave.com", "www.liverpoolfc.com"].includes(url.hostname));
     if (url.hostname === "api.gdeltproject.org") {
       return Response.json({ articles: [
         { title: "Fenerbahçe 3-2 Liverpool", url: "https://www.tff.org/fixture" },
@@ -50,4 +50,17 @@ test("automatic research returns trusted live-index results without visiting res
   });
   assert.ok(urls.some(url => url.hostname === "api.gdeltproject.org"));
   assert.deepEqual(results.map(row => row.url), ["https://www.tff.org/fixture"]);
+});
+
+test("official archive ties both scores to the same matching fixture card", () => {
+  const card = `<article data-testid="fixture-card-slotted">
+    <span class="fixture__score__test">3</span>
+    <span class="fixture__score__test">2</span>
+    <a href="/matches/mens-team/fenerbahce-v-liverpool-uefa-champions-league-20261104">Match Centre</a>
+  </article>`;
+  const [match] = readLiverpoolArchive(card, "Fenerbahçe Liverpool 2026");
+  assert.equal(match.title, "fenerbahce 3-2 liverpool");
+  assert.match(match.excerpt, /04\.11\.2026 · UEFA Şampiyonlar Ligi/);
+  assert.match(match.url, /^https:\/\/www\.liverpoolfc\.com\//);
+  assert.deepEqual(readLiverpoolArchive(card, "Barcelona Liverpool"), []);
 });
