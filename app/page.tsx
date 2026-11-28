@@ -662,6 +662,14 @@ export default function Home() {
         throw new Error(errData.error || "İstek başarısız oldu.");
       }
 
+      const pdfNotice = res.headers.get("X-Nexus-Pdf-Notice");
+      if (pdfNotice) {
+        try {
+          setNotice(decodeURIComponent(pdfNotice));
+        } catch {
+          setNotice("PDF kapsamı bilgisi okunamadı.");
+        }
+      }
       const contentType = res.headers.get("content-type") || "";
       if (contentType.includes("text/event-stream") && res.body) {
         const reader = res.body.getReader();

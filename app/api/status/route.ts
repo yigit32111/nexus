@@ -39,6 +39,7 @@ export async function GET() {
     provider,
     isAdmin: isCoreAdminId(user.id),
     accountId: user.id,
-    configured: Boolean(process.env.AI_API_KEY && validProviderBase(process.env.AI_BASE_URL||OPENROUTER_BASE)),
+    configured: Boolean((process.env.OPENROUTER_API_KEY || process.env.AI_API_KEY)
+      && validProviderBase(process.env.AI_BASE_URL||OPENROUTER_BASE)),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }

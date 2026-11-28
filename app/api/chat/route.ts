@@ -1,11 +1,14 @@
 import {readJsonLimited} from "../../../lib/core/request-guard";
 import {compactHistory} from "../../../lib/core/smart-context";
-import { extractPdfText } from "../../../lib/core/pdf-text";
+import { extractPdfText, PDF_PAGE_LIMIT } from "../../../lib/core/pdf-text";
+import { asksForDeveloper, DEVELOPER_CREDIT, developerCreditResponse } from "../../../lib/core/developer-credit";
+import { selectPdfContext, type PdfText } from "../../../lib/core/pdf-context";
+import { fetchUntilHeaders, retryCompletion } from "../../../lib/core/provider-timeout";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { writeUsageLog } from "../../../utils/supabase/admin";
 import { estimateTokens } from "../../../lib/nexus-utils";
-import { thinkingProfile, canRetryFreeModel, retryAfterSeconds } from "../../../lib/core/chat-profiles";
+import { thinkingProfile, retryAfterSeconds } from "../../../lib/core/chat-profiles";
 import { routeModel } from "../../../lib/core/model-router";
 import { reserveRequest, reportedCost } from "../../../lib/core/budget";
 import {relevantMemory,summarizeHistory,recallChats} from "../../../lib/workspace/intelligence";
@@ -99,11 +102,6 @@ export async function POST(req: NextRequest) {
       return fail("İstek biçimi geçersiz.");
     }
 
-    const key = process.env.AI_API_KEY;
-    if (!key) {
-      return fail("Sunucuda AI_API_KEY tanımlanmamış. Ortam değişkenlerini kontrol et.", 503);
-    }
-
     if (!Array.isArray(body.messages) || body.messages.length === 0 || body.messages.length > 50) {
       return fail("Mesaj geçmişi geçersiz. En fazla 50 mesaj gönderilebilir.");
     }
@@ -129,9 +127,17 @@ export async function POST(req: NextRequest) {
     if (attachments.length > MAX_ATTACHMENTS) {
       return fail(`Bir mesajda en fazla ${MAX_ATTACHMENTS} dosya ekleyebilirsin.`);
     }
+    if (!attachments.length && body.comparison !== true &&
+        lastUserIndex === messages.length - 1 && asksForDeveloper(latestUserQuery)) {
+      return developerCreditResponse(body.stream !== false);
+    }
+
+    const key = process.env.OPENROUTER_API_KEY || process.env.AI_API_KEY;
+    if (!key) return fail("Yapay zekâ sağlayıcısı sunucuda yapılandırılmamış.", 503);
 
     const imageParts: any[] = [];
     const extractedTexts: string[] = [];
+    const pdfs: PdfText[] = [];
 
     for (const file of attachments) {
       if (
@@ -155,12 +161,7 @@ export async function POST(req: NextRequest) {
         }
         try {
           const text = await extractPdfText(buffer);
-          extractedTexts.push(
-            `PDF: ${file.name}\n${(text || "PDF metni okunamadı.").slice(
-              0,
-              MAX_TEXT_LENGTH
-            )}`
-          );
+          pdfs.push({ name: file.name, text });
         } catch {
           console.error("NEXUS PDF ERROR");
           return fail(`PDF okunamadı: ${file.name}`, 422);
@@ -282,11 +283,6 @@ export async function POST(req: NextRequest) {
         messages[lastUserIndex].content
       )}\n\nEKLENEN DOSYALAR:\n${extractedTexts.join("\n\n").slice(0, MAX_TEXT_LENGTH)}`;
     }
-    if (imageParts.length) {
-      const original = messages[lastUserIndex].content;
-      messages[lastUserIndex].content = [{ type: "text", text: original }, ...imageParts];
-    }
-
     const base = (process.env.AI_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/+$/, "");
     const requestedModel = typeof body.model === "string" ? body.model.trim() : "";
     if (requestedModel && (requestedModel.length > 180 || !MODEL_RE.test(requestedModel))) {
@@ -312,13 +308,41 @@ export async function POST(req: NextRequest) {
     const useWebSearch = !comparison && preferences.webSearch === true;
     if(useWebSearch)return fail("Ücretli sağlayıcı web araması bu önizlemede kapalı. Ücretsiz araştırma için çalışma alanını kullan.",403);
     const profile = thinkingProfile(preferences.thinkingMode);
-    const completionSystem = system + profile.instruction;
+    const completionSystem = system + "\nGeliştirici bilgisi: " + DEVELOPER_CREDIT + profile.instruction;
     const useCodeExecution = preferences.codeExecution === true;
 
     // Core routing uses server-verified provider metadata.
 
     const wantStream = body.stream !== false;
-    const textOnly=completionSystem+JSON.stringify(messages.map(m=>({role:m.role,content:Array.isArray(m.content)?m.content.filter(x=>x.type==="text"):m.content})));
+    const systemMessage = { role: "system", content: completionSystem };
+    const serializedText = () => JSON.stringify([systemMessage, ...messages.map(m => ({
+      role: m.role, content: Array.isArray(m.content) ? m.content.filter(part => part.type === "text") : m.content,
+    }))]);
+    if (imageParts.length) {
+      messages[lastUserIndex].content = [{ type: "text", text: messages[lastUserIndex].content }, ...imageParts];
+    }
+    const imageAllowance = imageParts.length * 8192;
+    const pdfContext = selectPdfContext(pdfs, latestUserQuery,
+      Buffer.byteLength(serializedText()) + imageAllowance, "free");
+    if (pdfContext.overBudget) {
+      return fail("Sohbet geçmişi ve ekler giriş sınırını aşıyor. Daha kısa bir sohbet veya daha az ek kullan.", 413);
+    }
+    if (pdfContext.appendix) {
+      const lastMessage = messages[lastUserIndex];
+      if (Array.isArray(lastMessage.content)) lastMessage.content[0].text += pdfContext.appendix;
+      else lastMessage.content += pdfContext.appendix;
+    }
+    const responseHeaders = new Headers({ "Cache-Control": "no-store" });
+    if (pdfs.length) {
+      const count = pdfContext.totalBlocks
+        ? `${pdfContext.totalBlocks} metin bloğundan ${pdfContext.selectedBlocks} tanesi modele gönderildi.`
+        : "PDF’de okunabilir metin bulunamadı.";
+      const extraction = pdfContext.limitedExtraction ? " Çok uzun sayfa metinleri de sınırlandırıldı." : "";
+      responseHeaders.set("X-Nexus-Pdf-Notice", encodeURIComponent(
+        `Her PDF’nin ilk ${PDF_PAGE_LIMIT} sayfasına kadar bakıldı. ${count}${extraction}`,
+      ));
+    }
+    const textOnly = serializedText();
     const promptTokensEst = estimateTokens(textOnly);
     const automatic = comparison || !requestedModel || requestedModel === "auto";
     const routing = {
@@ -326,7 +350,7 @@ export async function POST(req: NextRequest) {
       defaultId: process.env.AI_MODEL || model,
       query: latestUserQuery + profile.routingHint,
       images: imageParts.length,
-      inputTokens: Buffer.byteLength(textOnly) + imageParts.length * 8192,
+      inputTokens: Buffer.byteLength(textOnly) + imageAllowance,
       web: useWebSearch,
       freeOnly: true, // Premium access remains disabled until atomic wallet and payment validation exist.
       exclude: excludedModel,
@@ -345,35 +369,31 @@ export async function POST(req: NextRequest) {
     async function complete(route: NonNullable<typeof first>) {
       if (!(await reserveRequest(user!.id, "chat", route.reserve))) return null;
       effectiveModel = route.model.id;
-      return fetch(`${base}/chat/completions`, {
+      return fetchUntilHeaders(attemptSignal => fetch(`${base}/chat/completions`, {
         method: "POST",
         headers,
-        signal,
+        signal: attemptSignal,
         cache: "no-store",
         redirect: "error",
         body: JSON.stringify({
           model: route.model.id,
-          messages: [{ role: "system", content: completionSystem }, ...messages],
+          messages: [systemMessage, ...messages],
           max_completion_tokens: profile.maxTokens,
           stream: wantStream,
           provider: { max_price: route.maxPrice },
           usage: { include: true },
           ...(route.model.supported.includes("temperature") ? { temperature } : {}),
         }),
-      });
+      }), signal);
     }
 
     let response = await complete(first);
     if (!response) return fail("Günlük kota doldu veya ücretli özellik kapalı.", 429);
-    if (automatic && !comparison && !useWebSearch && !signal.aborted && canRetryFreeModel(response.status)) {
-      const fallback = await routeModel({ ...routing, exclude: first.model.id }).catch(() => null);
-      if (fallback) {
-        const next = await complete(fallback);
-        if (next) {
-          await response.body?.cancel().catch(() => {});
-          response = next;
-        }
-      }
+    if (automatic && !comparison && !useWebSearch) {
+      response = await retryCompletion(response, signal, async () => {
+        const fallback = await routeModel({ ...routing, exclude: first.model.id }).catch(() => null);
+        return fallback && !signal.aborted ? complete(fallback) : null;
+      });
     }
 
     if (!response.ok) {
@@ -494,13 +514,9 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      return new Response(stream, {
-        headers: {
-          "Content-Type": "text/event-stream; charset=utf-8",
-          "Cache-Control": "no-cache, no-transform",
-          Connection: "keep-alive",
-        },
-      });
+      responseHeaders.set("Content-Type", "text/event-stream; charset=utf-8");
+      responseHeaders.set("Cache-Control", "no-store, no-transform");
+      return new Response(stream, { headers: responseHeaders });
     }
 
     const payload = await response.json().catch(() => ({}));
@@ -520,7 +536,7 @@ export async function POST(req: NextRequest) {
       reasoning: choice?.message?.reasoning || "",
       model: effectiveModel,
       ragSources,
-    });
+    }, { headers: responseHeaders });
   } catch (error: any) {
     console.error("NEXUS CHAT ERROR");
     if (error?.name === "TimeoutError" || error?.name === "AbortError") {

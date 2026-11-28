@@ -6,10 +6,10 @@ const read=p=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
 test("5.1 release policy keeps premium and real payments disabled",()=>{
  assert.deepEqual(BILLING_RELEASE,{targetMajor:10,paymentsEnabled:false,premiumEnabled:false});
  assert.equal(PRO_OFFER.monthlyBudgetMicrousd,5_000_000);
- assert.equal(PRO_OFFER.priceTry,399);
- const page=read("app/plans/page.tsx");
- assert.match(page,/<button[^>]*disabled/);
- assert.doesNotMatch(page,/<(?:form|input|textarea)\b/);
+ assert.equal(PRO_OFFER.priceTry,249);
+ const preview=read("components/ProPaymentPreview.tsx");
+ assert.match(preview,/<button[^>]*disabled/);
+ assert.doesNotMatch(preview + read("app/plans/page.tsx"),/<(?:form|input|textarea)\b/);
  assert.equal(existsSync(new URL("../app/api/payment",import.meta.url)),false);
  assert.equal(existsSync(new URL("../app/api/checkout",import.meta.url)),false);
 });
