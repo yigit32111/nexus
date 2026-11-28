@@ -1,17 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync, existsSync} from "node:fs";
-import {BILLING_RELEASE,PRO_OFFER} from "../lib/core/plans.ts";
+import {offers} from "../lib/billing/offers.ts";
 const read=p=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
-test("5.1 release policy keeps premium and real payments disabled",()=>{
- assert.deepEqual(BILLING_RELEASE,{targetMajor:10,paymentsEnabled:false,premiumEnabled:false});
- assert.equal(PRO_OFFER.monthlyBudgetMicrousd,5_000_000);
- assert.equal(PRO_OFFER.priceTry,249);
- const preview=read("components/ProPaymentPreview.tsx");
- assert.match(preview,/<button[^>]*disabled/);
- assert.doesNotMatch(preview + read("app/plans/page.tsx"),/<(?:form|input|textarea)\b/);
- assert.equal(existsSync(new URL("../app/api/payment",import.meta.url)),false);
- assert.equal(existsSync(new URL("../app/api/checkout",import.meta.url)),false);
+test("checkout prices and model allowances are bounded and separate",()=>{
+ assert.equal(offers.pro.price,249);
+ assert.ok(offers.plus.price > offers.pro.price && offers.plus.allowance > offers.pro.allowance);
+ assert.ok(offers.extra.price > 0 && offers.extra.allowance > 0);
 });
 test("retired image route has no provider integration",()=>{
  const image=read("app/api/image/route.ts");
@@ -27,3 +22,4 @@ test("release manifest and package lock versions match",()=>{
  assert.equal(lock.packages[""].version,pkg.version);
  assert.equal(manifest.name,`NEXUS AI ${pkg.version}`);
 });
+

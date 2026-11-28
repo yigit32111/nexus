@@ -1,5 +1,8 @@
 # NEXUS AI 5.1.2
 
+[Üyelik, tahsilat, Pro model bütçeleri ve test mağazası kurulumu](docs/billing.md)
+
+
 NEXUS, Türkçe sohbet, kaynaklı araştırma, belge üretimi ve sesli konuşmayı aynı hesapta bir araya getiren bir yapay zekâ çalışma alanıdır. 5.1.2’de sohbetten kaynak arama ve Derin düşünme düğmeleri ile kod taslağı yazma, çıktı aktarma ve yazdırma araçları bulunur. [Smart Context](docs/5.1-smart-context.md) · [Cost Intelligence](docs/5.1-cost-intelligence.md)
 
 ## Nereden başlanır?
@@ -50,7 +53,7 @@ Ses tanıma tarayıcı desteğine, mikrofon iznine ve cihazın konuşma servisin
 Yönetici hesabı `/admin` sayfasında şu göstergeleri görür:
 
 - **Çevrimiçi kullanıcı** son iki dakikada görünür sohbet, çalışma alanı veya yönetim sekmesinden sinyal veren benzersiz hesapları sayar. Açık yönetim paneli yaklaşık dakikada bir yenilenir.
-- **Free ve Pro hesaplar** sunucunun yönettiği hesap bilgilerinden sayılır. `app_metadata.plan` değeri `pro` olan hesaplar Pro grubundadır.
+- **Free ve Pro hesaplar** doğrulanmış ve süresi devam eden ödeme kayıtlarına göre sayılır.
 - **Toplam token** tüm kullanıcıların kayıtlı giriş ve çıkış tokenlarının toplamıdır. Bazı kullanım değerleri tahminidir.
 - **Günlük kotalar** UTC gününe göre istekler, görsel denemeleri, kullanım kayıtları, ayrılan bütçe ve kullanıcı başına sınırları gösterir. Yönetim ekranı salt okunurdur.
 - **Cost Intelligence önizlemesi** son yedi UTC gününün token kullanımını ve modele göre kullanım dökümünü gösterir. Maliyeti bilinmeyen kayıtlar ayrıca işaretlenir.
@@ -78,7 +81,7 @@ Tarayıcıda `http://localhost:3000` adresini aç. Üretim için önce `npm run 
 | `SUPABASE_SECRET_KEY` | Sunucuda kota, kullanım ve yetkili veri işlemleri. Eski anahtar için `SUPABASE_SERVICE_ROLE_KEY` desteklenir. |
 | `OPENROUTER_API_KEY` | OpenRouter sunucu anahtarı. Mevcut kurulumlar `AI_API_KEY` ile çalışmaya devam eder. |
 | `BRAVE_SEARCH_API_KEY` | İsteğe bağlı Brave LLM Context anahtarı. Maç, kadro, transfer ve haber istekleri anahtarsız da konuya göre Google Haberler ve GDELT dizinlerinden sonuç arar. Brave yapılandırılırsa sayfa alıntıları eklenir. |
-| `AI_BASE_URL`, `AI_MODEL` | İsteğe bağlı sağlayıcı adresi ve varsayılan model. NEXUS 5.1 doğrulanmış ücretsiz OpenRouter modellerini kullanır. AI_MODEL, Auto için ikincil öncelik ipucudur. Varsayılan adres `https://openrouter.ai/api/v1` değeridir. |
+| `AI_BASE_URL`, `AI_MODEL` | İsteğe bağlı sağlayıcı adresi ve varsayılan model. Auto doğrulanmış ücretsiz modelleri, ücretli sohbet doğrulanmış Pro listesini kullanır. AI_MODEL, Auto için ikincil öncelik ipucudur. Varsayılan adres `https://openrouter.ai/api/v1` değeridir. |
 | `NEXUS_ADMIN_USER_ID` | Yönetim paneline erişecek Supabase kullanıcısının UUID değeri |
 | `NEXUS_ADDITIONAL_ADMIN_USER_IDS` | İsteğe bağlı, virgülle ayrılmış ek yönetici Supabase kullanıcı UUID’leri. Sunucu tarafında tanımlanır. |
 | `NEXT_PUBLIC_APP_URL` | Paylaşım bağlantıları için uygulamanın dışarıdan erişilen adresi |
@@ -95,3 +98,4 @@ npm audit --omit=dev --audit-level=moderate
 ```
 
 GitHub Actions ayrıca çalışan üretim sunucusunda genel ve korumalı yolları, Chromium masaüstünü, WebKit mobil görünümlerini ve çalışma alanı akışlarını kontrol eder. Testler model karşılaştırması, belgeye aktarım, Agent onayı, Code Lab, son sohbetin silinmesi ve ses denetimlerini kapsar. Ses testinde tanıma olayları benzetilir. Fiziksel iPhone mikrofonu, hoparlörü ve gerçek sağlayıcıyla uçtan uca sesli konuşma ayrıca doğrulanmalıdır. [Test komutları ve ortamı](.github/workflows/alpha-ci.yml) · [GitHub Actions sonuçları](https://github.com/yigit32111/nexus/actions)
+

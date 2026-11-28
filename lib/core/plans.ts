@@ -1,7 +1,3 @@
-// Planned commercial offer. No entitlement or payment is granted by these constants.
-// Product decision: no checkout or paid access before the 10.0 billing release.
-export const BILLING_RELEASE = Object.freeze({targetMajor:10, paymentsEnabled:false, premiumEnabled:false});
-export const PRO_OFFER = Object.freeze({priceTry:249, monthlyBudgetMicrousd:5_000_000});
 export const PRO_MODELS = Object.freeze(["openai/gpt-5.6-luna","anthropic/claude-haiku-5.5"] as const);
 export const FREE_MODELS = Object.freeze({
  chat:"baidu/ernie-5.5-flash-preview:free",
@@ -21,13 +17,4 @@ export function modelPriority(query:string,images:number): readonly string[] {
 }
 export function accountPlan(appMetadata:unknown):"free"|"pro" {
  return appMetadata!==null&&typeof appMetadata==="object"&&(appMetadata as Record<string,unknown>).plan==="pro"?"pro":"free";
-}
-// Pure reservation check for future atomic DB transaction; never used as an actual wallet.
-export function canReservePro(spent:number,reserved:number,next:number):boolean {
- return [spent,reserved,next].every(v=>Number.isSafeInteger(v)&&v>=0&&v<=PRO_OFFER.monthlyBudgetMicrousd)&&spent+reserved+next<=PRO_OFFER.monthlyBudgetMicrousd;
-}
-
-// Owner-only display preview; never grants inference, subscription, or credit access.
-export function ownerPreviewPlan(verifiedAdmin:unknown):"free"|"pro" {
- return verifiedAdmin === true ? "pro" : "free";
 }

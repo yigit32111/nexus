@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {notFound} from "next/navigation";
-import {BILLING_RELEASE,PRO_OFFER} from "../../lib/core/plans";
+import {configured} from "../../lib/billing/server";
 import {getCoreAdmin} from "../../lib/core/permissions";
 import {createAdminClient} from "../../utils/supabase/admin";
 import {NexusLogo} from "../../components/NexusBrand";
@@ -36,8 +36,8 @@ export default async function AdminPage(){
       <header id="overview" className="n51-header"><span className="n51-kicker">NEXUS · 5.1 ÖNİZLEME</span><h1>Admin Center 3.0</h1><p>UTC gün: {day} · Salt okunur yönetim</p></header>
       {counts.error||!counts.data?<p className="n51-warning">Genel göstergeler alınamadı.</p>:<div className="n51-grid n51-overview">{Object.entries({
         "Çevrimiçi · son 2 dakika":counts.data.online,
-        "Free · eski metadata":counts.data.free,
-        "Pro · eski metadata":counts.data.pro,
+        "Free":counts.data.free,
+        "Pro":counts.data.pro,
         "Toplam token · tüm zamanlar":counts.data.tokens
       }).map(([label,value])=><div className="n51-card" key={label}><span>{label}</span><strong>{BigInt(String(value)).toLocaleString("tr-TR")}</strong></div>)}</div>}
       {usage.error?<section id="cost" className="n51-card"><h2>Kullanım ve maliyet</h2><p role="status">Kullanım kayıtları alınamadı. Veri yok olarak yorumlanmamalıdır.</p></section>:<CostIntelligence rows={usage.data??[]} exactCount={usage.count} now={now}/>}
@@ -50,8 +50,9 @@ export default async function AdminPage(){
           </div>
           <div className="n51-card"><h3>Kullanıcı limitleri</h3><strong>{cfg.user_requests} istek</strong><span>Tahmini bütçe: {usd(Number(cfg.user_budget_microusd))}</span><small>Limitler yetkili Supabase yönetiminden düzenlenir.</small></div>
         </div>
-        <div className="n51-card"><h3>Üyelik ve ödeme</h3><p>Yönetici Pro önizlemesi açık · diğer hesaplar Free. Eski hesap etiketleri ücretli erişim sağlamaz.</p><p>Ücretli AI: {BILLING_RELEASE.premiumEnabled?"Açık":"Kapalı"} · Ödeme: {BILLING_RELEASE.paymentsEnabled?"Açık":"Kapalı"} · hedef {BILLING_RELEASE.targetMajor}.0</p><p>Planlanan Pro: {PRO_OFFER.priceTry} TL/ay · {PRO_OFFER.monthlyBudgetMicrousd/1e6} USD ortak bütçe. Sadece önizleme; gerçek ödeme yok.</p><small>Eski ücretli kota bayrağı: {cfg.paid_enabled?"Açık":"Kapalı"} (premium erişim vermez). Kota muhasebesi gerçek fatura değildir.</small></div>
+        <div className="n51-card"><h3>Üyelik ve ödeme</h3><p>Ödeme ortamı · {configured()?process.env.NEXUS_BILLING_MODE:"Kapalı"}</p><Link href="/plans">Planlar ve kullanım limitleri</Link></div>
       </section>
     </div>
   </main>;
 }
+

@@ -27,13 +27,9 @@ for(const mode of modes){
   assert.equal(new URL(page.url()).pathname,"/login");
   await page.goto(base+"/plans",{waitUntil:"domcontentloaded"});
   await page.getByRole("heading",{name:"Üyelik planları"}).waitFor();
-  await page.getByRole("button",{name:"Ödeme önizlemesini gör"}).click();
-  await page.getByRole("heading",{name:"Ödeme özeti"}).waitFor();
-  assert.equal(await page.getByRole("button",{name:"Ödeme kapalı — NEXUS 10.0"}).isDisabled(),true);
-  assert.equal(await page.locator("form,input,textarea").count(),0);
-  assert.equal(await page.getByRole("dialog").getByText("249 TL",{exact:true}).count(),1);
-  await page.getByRole("dialog").getByRole("button",{name:"Kapat",exact:true}).click();
-  await page.getByRole("dialog").waitFor({state:"hidden"});
+  await page.getByRole("heading",{name:"NEXUS Pro Plus"}).waitFor();
+  assert.equal(await page.getByRole("button",{name:"Abone ol"}).first().isDisabled(),true);
+  await page.getByText("Ödemeler henüz açılmadı.").waitFor();
   const planSize=await page.evaluate(()=>({scroll:document.querySelector(".plans-page").scrollWidth,width:window.innerWidth}));
   assert.ok(planSize.scroll<=planSize.width+2,mode.name+" plans overflow");
   console.log("OK payment preview",mode.name);
@@ -41,3 +37,4 @@ for(const mode of modes){
   console.log("OK browser",mode.name);await context.close();
  }finally{await browser.close()}
 }
+

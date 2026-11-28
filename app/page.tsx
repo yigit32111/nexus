@@ -153,7 +153,8 @@ export default function Home() {
     [prefs.memoryItems]
   );
   const desiredModelId = activeGem?.model || prefs.model;
-  const effectiveModelId = models.some(m=>m.id===desiredModelId&&m.free===true) ? desiredModelId : "auto";
+  const [extraAccount,setExtraAccount]=useState("");
+  const effectiveModelId = models.some(m=>m.id===desiredModelId&&(m.free===true || (planStatus?.accountId===userId && planStatus?.plan==="pro"))) ? desiredModelId : "auto";
   const selectedModel = models.find((m) => m.id === effectiveModelId);
   const isGroqProvider = provider === "GROQ";
 
@@ -635,6 +636,7 @@ export default function Home() {
           projectId: activeChat.projectId,
           chatId: activeChat.id,
           model: effectiveModelId || undefined,
+          useExtra: Boolean(userId && extraAccount===userId),
           modelSupportsVision:
             selectedModel?.vision === true || VISION_ID_RE.test(effectiveModelId),
           modelSupportsTemperature: supportsTemp,
@@ -734,6 +736,13 @@ export default function Home() {
         }
       }
 
+      if (contentType.includes("application/json")) {
+        const answer=await res.json();
+        accumulatedContent=answer.reply || "";
+        accumulatedReasoning=answer.reasoning || "";
+        routedModel=answer.model;
+        receivedSources=answer.ragSources || [];
+      }
       if (!accumulatedContent.trim()) {
         accumulatedContent = "Yanıt alınamadı. Modeli değiştirip tekrar dene.";
       }
@@ -1039,6 +1048,7 @@ export default function Home() {
             }
           />
 
+          {selectedModel && !selectedModel.free && <label><input type="checkbox" checked={Boolean(userId && extraAccount===userId)} onChange={e=>setExtraAccount(e.target.checked?userId:"")} /> Aylık hakkım yetmezse satın aldığım ek krediyi kullan</label>}
           <Composer
             accountId={userId}
             input={input}
@@ -1187,3 +1197,4 @@ export default function Home() {
     </main>
   );
 }
+
