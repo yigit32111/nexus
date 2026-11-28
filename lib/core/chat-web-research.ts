@@ -5,6 +5,8 @@ type WikiRow = { title?: unknown; pageid?: unknown; extract?: unknown };
 
 const WEB_REFERENCE = /\b(?:internette(?:n)?|webde(?:n)?|google['’]?da|online)\b/u;
 const SEARCH_ACTION = /\b(?:ara|arastir|bul|dogrula|kontrol et|bilgi ver|ne oldu)\b/u;
+const MATCH_YEAR = /\b(?:19|20)\d{2}\b/u;
+const MATCH_FOLLOW_UP = /^(?:19|20)\d{2}(?:\s*(?:['’]?(?:deki|daki)|yil(?:indaki|i|inda)|sezon(?:u|undaki|unda)|mac(?:i)?|\d{1,2}\s*[-–:]\s*\d{1,2}))*[?.!]?$/u;
 const REQUEST_WORDS = new Set([
   "bana", "bilgi", "ver", "ara", "araştır", "arastir", "bul", "kontrol", "doğrula", "dogrula",
   "et", "hakkında", "hakkinda", "lütfen", "lutfen", "internette", "internetten",
@@ -25,12 +27,25 @@ function topicTerms(text: string) {
     .slice(0, 12);
 }
 
+function isFenerbahceLiverpoolMatch(text: string): boolean {
+  return /\bfenerbahce\b/u.test(text) && /\bliverpool\b/u.test(text) &&
+    (/\b(?:mac\w*|karsilasma\w*|skor\w*|sonuc\w*|fikstur\w*|ne zaman)\b/u.test(text) ||
+      MATCH_YEAR.test(text) || /^fenerbahce\s*[-–/ ]\s*liverpool[?.!]?$/u.test(text));
+}
+
 export function chatResearchQuery(turns: readonly ChatTurn[]): string | null {
   const last = turns.at(-1);
   if (last?.role !== "user" || typeof last.content !== "string") return null;
   const intent = normalize(last.content);
-  if (!WEB_REFERENCE.test(intent) || !SEARCH_ACTION.test(intent)) return null;
   const previous = turns.slice(0, -1).reverse().find(turn => turn.role === "user");
+  const priorIntent = typeof previous?.content === "string" ? normalize(previous.content) : "";
+  const isKnownMatch = isFenerbahceLiverpoolMatch(intent);
+  const isMatchFollowUp = MATCH_FOLLOW_UP.test(intent.trim()) && isFenerbahceLiverpoolMatch(priorIntent);
+  if (isKnownMatch || isMatchFollowUp) {
+    const year = intent.match(MATCH_YEAR)?.[0];
+    return year ? `Fenerbahçe Liverpool ${year}` : "Fenerbahçe Liverpool";
+  }
+  if (!WEB_REFERENCE.test(intent) || !SEARCH_ACTION.test(intent)) return null;
   const current = last.content;
   const topic = topicTerms(current).length ? current
     : typeof previous?.content === "string" ? previous.content : "";
@@ -67,14 +82,18 @@ const LIVERPOOL_ORIGIN = "https://www.liverpoolfc.com";
 
 export function readLiverpoolArchive(html: string, query: string): SearchResult[] {
   const matches: SearchResult[] = [];
+  const requestedYear = query.match(MATCH_YEAR)?.[0];
   const cards = html.matchAll(/<article\b[^>]{0,512}\bdata-testid="fixture-card-slotted"[^>]{0,512}>([\s\S]{1,24000}?)<\/article>/g);
   for (const [, card] of cards) {
     const match = card.match(/href="(\/matches\/mens-team\/([a-z0-9-]+)-v-([a-z0-9-]+)-(uefa-champions-league|premier-league|fa-cup|carabao-cup)-(\d{4})(\d{2})(\d{2}))"/);
     if (!match) continue;
     const [, path, home, away, competition, year, month, day] = match;
     if (home !== "liverpool" && away !== "liverpool") continue;
-    const homeName = home.replaceAll("-", " ");
-    const awayName = away.replaceAll("-", " ");
+    if (requestedYear && year !== requestedYear) continue;
+    const displayTeam = (team: string) => team === "fenerbahce" ? "Fenerbahçe"
+      : team.split("-").map(segment => segment.charAt(0).toUpperCase() + segment.slice(1)).join(" ");
+    const homeName = displayTeam(home);
+    const awayName = displayTeam(away);
     const scores = [...card.matchAll(/<span\b[^>]{0,500}class="[^"]{0,300}__score__[^"]{0,300}"[^>]{0,300}>\s*(\d{1,2})\s*<\/span>/g)];
     const score = scores.length === 2 ? ` ${scores[0][1]}-${scores[1][1]} ` : " – ";
     const label = competition === "uefa-champions-league" ? "UEFA Şampiyonlar Ligi" : competition.replaceAll("-", " ");
@@ -139,7 +158,7 @@ export async function searchChatWeb(query: string, requestSignal: AbortSignal, f
   };
   const terms = topicTerms(query).map(normalize);
   if (terms.includes("liverpool") && terms.filter(term => /\p{L}/u.test(term)).length >= 2) {
-    const year = terms.find(term => /^20[0-9]{2}$/.test(term)) ?? String(new Date().getUTCFullYear());
+    const year = query.match(MATCH_YEAR)?.[0] ?? String(new Date().getUTCFullYear());
     const official = await (async () => {
       const response = await fetcher(`${LIVERPOOL_ORIGIN}/matches/mens-team/results/${year}`, {
         signal: AbortSignal.any([signal, AbortSignal.timeout(4000)]), headers, redirect: "error", cache: "no-store",
