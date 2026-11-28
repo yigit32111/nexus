@@ -4,6 +4,8 @@ import { extractPdfText, PDF_PAGE_LIMIT } from "../../../lib/core/pdf-text";
 import { asksForDeveloper, DEVELOPER_CREDIT, developerCreditResponse } from "../../../lib/core/developer-credit";
 import { selectPdfContext, type PdfText } from "../../../lib/core/pdf-context";
 import { fetchUntilHeaders, retryCompletion } from "../../../lib/core/provider-timeout";
+import { chatResearchQuery, formatChatResearch, searchChatWeb } from "../../../lib/core/chat-web-research";
+import { localChatResponse } from "../../../lib/core/local-chat-response";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { writeUsageLog } from "../../../utils/supabase/admin";
@@ -130,6 +132,15 @@ export async function POST(req: NextRequest) {
     if (!attachments.length && body.comparison !== true &&
         lastUserIndex === messages.length - 1 && asksForDeveloper(latestUserQuery)) {
       return developerCreditResponse(body.stream !== false);
+    }
+    if (!attachments.length && body.comparison !== true) {
+      const query = chatResearchQuery(messages);
+      if (query !== null) {
+        if (!query) return localChatResponse("Webde aramam için kişisel bilgi içermeyen kısa bir konu yaz.", body.stream !== false);
+        if (!await reserveRequest(user.id, "chat", 0)) return fail("Günlük araştırma kotası doldu.", 429);
+        const sources = await searchChatWeb(query, req.signal);
+        return localChatResponse(formatChatResearch(sources), body.stream !== false);
+      }
     }
 
     const key = process.env.OPENROUTER_API_KEY || process.env.AI_API_KEY;

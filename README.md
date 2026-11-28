@@ -77,6 +77,7 @@ Tarayıcıda `http://localhost:3000` adresini aç. Üretim için önce `npm run 
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Tarayıcı için yayımlanabilir anahtar. Eski projelerde `NEXT_PUBLIC_SUPABASE_ANON_KEY` kullanılabilir. |
 | `SUPABASE_SECRET_KEY` | Sunucuda kota, kullanım ve yetkili veri işlemleri. Eski anahtar için `SUPABASE_SERVICE_ROLE_KEY` desteklenir. |
 | `OPENROUTER_API_KEY` | OpenRouter sunucu anahtarı. Mevcut kurulumlar `AI_API_KEY` ile çalışmaya devam eder. |
+| `BRAVE_SEARCH_API_KEY` | İsteğe bağlı genel web arama anahtarı. Sohbetin açık web arama istekleri anahtar olmadan GDELT ve Vikipedi dizinlerini, uygun maç sorgularında da Liverpool FC arşivini kullanabilir. |
 | `AI_BASE_URL`, `AI_MODEL` | İsteğe bağlı sağlayıcı adresi ve varsayılan model. NEXUS 5.1 doğrulanmış ücretsiz OpenRouter modellerini kullanır. AI_MODEL, Auto için ikincil öncelik ipucudur. Varsayılan adres `https://openrouter.ai/api/v1` değeridir. |
 | `NEXUS_ADMIN_USER_ID` | Yönetim paneline erişecek Supabase kullanıcısının UUID değeri |
 | `NEXUS_ADDITIONAL_ADMIN_USER_IDS` | İsteğe bağlı, virgülle ayrılmış ek yönetici Supabase kullanıcı UUID’leri. Sunucu tarafında tanımlanır. |
