@@ -11,9 +11,18 @@ test("explicit web requests resolve short follow-ups from user turns only", () =
   assert.equal(chatResearchQuery(messages), "Fenerbahçe Liverpool");
   assert.equal(chatResearchQuery([{ role: "user", content: "Bana internette Fenerbahçe Liverpool maçı hakkında bilgi ver." }]), "Fenerbahçe Liverpool");
   assert.equal(chatResearchQuery([{ role: "user", content: "İnternette çok zaman geçiriyorum." }]), null);
-  assert.equal(chatResearchQuery([{ role: "user", content: "Fenerbahçe Liverpool" }]), null);
+  assert.equal(chatResearchQuery([{ role: "user", content: "Fenerbahçe Liverpool" }]), "Fenerbahçe Liverpool");
   assert.equal(chatResearchQuery([{ role: "user", content: "İnternette birisi@example.com ara" }]), "");
   assert.equal(chatResearchQuery([{ role: "user", content: "İnternette araştır" }]), "");
+});
+
+test("Fenerbahçe Liverpool match questions search without a keyword and carry the requested year", () => {
+  const question = { role: "user", content: "bana fenerbahçe -liverpool maçı hakkında bilgi ver" };
+  assert.equal(chatResearchQuery([question]), "Fenerbahçe Liverpool");
+  assert.equal(chatResearchQuery([question, { role: "assistant", content: "Maç hangi yıl?" },
+    { role: "user", content: "2026 daki maç" }]), "Fenerbahçe Liverpool 2026");
+  assert.equal(chatResearchQuery([question, { role: "user", content: "2026 3-2" }]), "Fenerbahçe Liverpool 2026");
+  assert.equal(chatResearchQuery([{ role: "user", content: "2026 daki maç" }]), null);
 });
 
 test("official matches rank above reports and unverifiable or unrelated hosts are discarded", () => {
@@ -59,8 +68,9 @@ test("official archive ties both scores to the same matching fixture card", () =
     <a href="/matches/mens-team/fenerbahce-v-liverpool-uefa-champions-league-20261104">Match Centre</a>
   </article>`;
   const [match] = readLiverpoolArchive(card, "Fenerbahçe Liverpool 2026");
-  assert.equal(match.title, "fenerbahce 3-2 liverpool");
+  assert.equal(match.title, "Fenerbahçe 3-2 Liverpool");
   assert.match(match.excerpt, /04\.11\.2026 · UEFA Şampiyonlar Ligi/);
   assert.match(match.url, /^https:\/\/www\.liverpoolfc\.com\//);
   assert.deepEqual(readLiverpoolArchive(card, "Barcelona Liverpool"), []);
+  assert.deepEqual(readLiverpoolArchive(card, "Fenerbahçe Liverpool 2025"), []);
 });
