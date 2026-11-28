@@ -15,3 +15,6 @@
 .plans-checkout{margin-top:20px;scroll-margin-top:16px}.plans-checkout dl{margin:16px 0}.plans-checkout dl div{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #303e51}.plans-checkout dt{color:#b5c2d4;overflow-wrap:anywhere}.plans-checkout dd{margin:0;text-align:right;font-weight:650;flex-shrink:0;color:#f8fafc}.plans-total dd{font-size:20px}.plans-checkout .plans-note,.plans-checkout small{font-size:13px;color:#a5b4c7}.plans-disabled{background:#253044;color:#c5cedb;border:1px solid #3d4b60;cursor:not-allowed;opacity:1;margin:0 0 12px}
 @media(max-width:600px){.plans-grid{grid-template-columns:minmax(0,1fr)}.plans-card,.plans-checkout{padding:18px}.plans-hero{padding-top:24px}.plans-checkout dl div{gap:8px;font-size:14px}}
 @media(prefers-reduced-motion:reduce){.plans-page{scroll-behavior:auto}}
+.plans-preview-dialog{position:fixed;inset:0;margin:auto;width:min(440px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto;color:#f1f5f9;gap:12px}
+.plans-preview-dialog:not([open]){display:none}
+.plans-preview-dialog::backdrop{background:#070a12cc}

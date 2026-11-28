@@ -151,7 +151,7 @@ try {
   await page.getByRole("button",{name:"Hesap ve veri"}).click();
   await page.getByText("Planlanan ortak API bütçesi",{exact:true}).waitFor();
   assert.equal(await page.getByText("5 USD / ay",{exact:true}).count(),1);
-  assert.equal(await page.getByText("399 TL / ay",{exact:true}).count(),1);
+  assert.equal(await page.getByText("249 TL / ay",{exact:true}).count(),1);
   await page.getByText("Premium model erişimi",{exact:true}).waitFor();
   await page.getByText("Kapalı",{exact:true}).waitFor();
   await page.getByText("Free erişimi. Ücretli modeller ve ödeme kapalıdır.",{exact:true}).waitFor();
