@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { validProviderBase,OPENROUTER_BASE } from "../../../lib/core/free-catalog";
-import { ownerPreviewPlan, PRO_OFFER, BILLING_RELEASE } from "../../../lib/core/plans";
+import {balance,configured} from "../../../lib/billing/server";
 import { isCoreAdminId } from "../../../lib/core/permissions";
 
 export const runtime = "nodejs";
@@ -29,13 +29,13 @@ export async function GET() {
     ? "OPENAI"
     : "CUSTOM AI";
 
+  const wallet=await balance(user.id);
   return NextResponse.json({
     model: "auto",
-    plan: ownerPreviewPlan(isCoreAdminId(user.id)),
-    premiumEnabled: BILLING_RELEASE.premiumEnabled,
-    paymentsEnabled: BILLING_RELEASE.paymentsEnabled,
-    billingTargetMajor: BILLING_RELEASE.targetMajor,
-    plannedProOffer: PRO_OFFER,
+    plan:wallet.pro?"pro":"free",
+    wallet,
+    premiumEnabled:configured() && process.env.NEXUS_BILLING_MODE==="live",
+    paymentsEnabled:configured(),
     provider,
     isAdmin: isCoreAdminId(user.id),
     accountId: user.id,
@@ -43,3 +43,4 @@ export async function GET() {
       && validProviderBase(process.env.AI_BASE_URL||OPENROUTER_BASE)),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
+

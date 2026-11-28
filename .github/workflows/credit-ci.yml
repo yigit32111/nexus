@@ -36,3 +36,15 @@ jobs:
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
         run: bash tests/credit-concurrency.sh
+
+      - name: Billing grants, reservations, refunds and tenant isolation
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          {
+            cat tests/billing-fixture.sql
+            cat supabase/migrations/20261126160628_nexus_33_alpha1_core.sql
+            cat supabase/migrations/20261128000100_nexus_billing.sql
+            echo "update public.nexus_core_limits set paid_enabled=true; set role service_role;"
+            cat tests/billing-ledger.sql
+          } | docker exec -i "$PG_CONTAINER" psql -X -U postgres -v ON_ERROR_STOP=1

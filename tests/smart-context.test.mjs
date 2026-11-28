@@ -38,7 +38,8 @@ test("route compacts before attachment insertion and token accounting, preferenc
  assert.match(route,/enabled:preferences.smartContext!==false,hasAttachments:attachments.length>0/);
  assert.ok(route.indexOf("const compact=compactHistory")<route.indexOf("if (extractedTexts.length)"));
  assert.ok(route.indexOf("const compact=compactHistory")<route.indexOf("const promptTokensEst"));
- assert.match(route,/freeOnly: true/);
+ assert.match(route,/freeOnly: !paidChoice/);
  assert.match(read("app/page.tsx"),/smartContext: prefs.smartContext !== false/);
  assert.match(read("components/SettingsModal.tsx"),/checked=\{prefs.smartContext!==false\}/);
 });
+

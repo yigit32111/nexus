@@ -1,23 +1,18 @@
 "use client";
+import {useState} from "react";
+import type {Offer} from "../lib/billing/offers";
 
-import { useRef } from "react";
-import { PRO_OFFER } from "../lib/core/plans";
-
-export function ProPaymentPreview() {
-  const dialog = useRef<HTMLDialogElement>(null);
-  return <>
-    <button type="button" className="plans-action plans-primary" aria-haspopup="dialog"
-      onClick={() => dialog.current?.showModal()}>
-      Ödeme önizlemesini gör
-    </button>
-    <dialog ref={dialog} className="plans-card plans-preview-dialog" aria-labelledby="checkout-title">
-      <h2 id="checkout-title">Ödeme özeti</h2>
-      <p>Planlanan fiyat <strong>{PRO_OFFER.priceTry} TL</strong> / ay.</p>
-      <p>Öngörülen aylık model bütçesi {PRO_OFFER.monthlyBudgetMicrousd / 1_000_000} USD.</p>
-      <p>Ödeme ve Pro aktivasyonu henüz açılmadı.</p>
-      <button type="button" className="plans-action plans-disabled" disabled>Ödeme kapalı — NEXUS 10.0</button>
-      <button type="button" className="plans-action plans-secondary"
-        onClick={() => dialog.current?.close()}>Kapat</button>
-    </dialog>
-  </>;
+export function BillingButton({offer,enabled,label}:{offer:Offer|"portal";enabled:boolean;label:string}){
+  const [busy,setBusy]=useState(false),[error,setError]=useState("");
+  async function open(){
+    setBusy(true);setError("");
+    try{
+      const r=await fetch("/api/billing/checkout?offer="+offer,{method:"POST"});
+      if(r.status===401){location.assign("/login");return;}
+      const data=await r.json();
+      if(!r.ok || !data.url) throw new Error(data.error || "İşlem başlatılamadı.");
+      location.assign(data.url);
+    }catch(e){setError(e instanceof Error?e.message:"Bağlantı hatası.");setBusy(false);}
+  }
+  return <><button className="plans-action plans-primary" disabled={!enabled || busy} onClick={open}>{busy?"Açılıyor…":label}</button>{error && <p role="alert">{error}</p>}</>;
 }

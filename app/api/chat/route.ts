@@ -13,6 +13,8 @@ import { writeUsageLog } from "../../../utils/supabase/admin";
 import { estimateTokens } from "../../../lib/nexus-utils";
 import { thinkingProfile, retryAfterSeconds } from "../../../lib/core/chat-profiles";
 import { routeModel } from "../../../lib/core/model-router";
+import {balance} from "../../../lib/billing/server";
+import {createAdminClient} from "../../../utils/supabase/admin";
 import { reserveRequest, reportedCost } from "../../../lib/core/budget";
 import {relevantMemory,summarizeHistory,recallChats} from "../../../lib/workspace/intelligence";
 
@@ -331,7 +333,16 @@ export async function POST(req: NextRequest) {
 
     // Core routing uses server-verified provider metadata.
 
-    const wantStream = body.stream !== false;
+    const paidChoice = !comparison && model !== "auto" && !model.endsWith(":free");
+    const wallet = paidChoice || pdfs.length ? await balance(user.id) : null;
+    if (paidChoice && !wallet?.pro) return fail("Bu model için etkin Pro üyeliği gerekir.",403);
+    if (paidChoice && process.env.NEXUS_BILLING_MODE !== "live") return fail("Test ortamında ücretli model çağrıları kapalı.",403);
+    const wantStream = body.stream !== false && !paidChoice;
+    const requestId = crypto.randomUUID();
+    async function settle(cost:number){
+      const {error}=await createAdminClient().rpc("nexus_billing_settle",{p_request:requestId,p_actual:cost});
+      if(error) throw error;
+    }
     const systemMessage = { role: "system", content: completionSystem };
     const serializedText = () => JSON.stringify([systemMessage, ...messages.map(m => ({
       role: m.role, content: Array.isArray(m.content) ? m.content.filter(part => part.type === "text") : m.content,
@@ -341,7 +352,7 @@ export async function POST(req: NextRequest) {
     }
     const imageAllowance = imageParts.length * 8192;
     const pdfContext = selectPdfContext(pdfs, latestUserQuery,
-      Buffer.byteLength(serializedText()) + imageAllowance, "free");
+      Buffer.byteLength(serializedText()) + imageAllowance, wallet?.pro ? "pro":"free");
     if (pdfContext.overBudget) {
       return fail("Sohbet geçmişi ve ekler giriş sınırını aşıyor. Daha kısa bir sohbet veya daha az ek kullan.", 413);
     }
@@ -370,7 +381,7 @@ export async function POST(req: NextRequest) {
       images: imageParts.length,
       inputTokens: Buffer.byteLength(textOnly) + imageAllowance,
       web: useWebSearch,
-      freeOnly: true, // Premium access remains disabled until atomic wallet and payment validation exist.
+      freeOnly: !paidChoice,
       exclude: excludedModel,
     };
     const first = await routeModel(routing).catch(() => null);
@@ -385,7 +396,13 @@ export async function POST(req: NextRequest) {
     };
     const signal = AbortSignal.any([req.signal, AbortSignal.timeout(120000)]);
     async function complete(route: NonNullable<typeof first>) {
-      if (!(await reserveRequest(user!.id, "chat", route.reserve))) return null;
+      if (paidChoice) {
+        const {data,error}=await createAdminClient().rpc("nexus_billing_reserve",{
+          p_user:user!.id,p_request:requestId,p_model:route.model.id,p_amount:route.reserve,p_extra:body.useExtra===true,
+        });
+        if(error) throw error;
+        if(!data) return null;
+      } else if (!(await reserveRequest(user!.id, "chat", 0))) return null;
       effectiveModel = route.model.id;
       return fetchUntilHeaders(attemptSignal => fetch(`${base}/chat/completions`, {
         method: "POST",
@@ -402,10 +419,11 @@ export async function POST(req: NextRequest) {
           usage: { include: true },
           ...(route.model.supported.includes("temperature") ? { temperature } : {}),
         }),
-      }), signal);
+      }), paidChoice ? AbortSignal.timeout(120000) : signal);
     }
 
     let response = await complete(first);
+    if (!response && paidChoice) return fail("Bu istek için Pro bakiyesi yetersiz veya kullanım limitine ulaşıldı. Auto ile devam edebilirsin.",402);
     if (!response) return fail("Günlük kota doldu veya ücretli özellik kapalı.", 429);
     if (automatic && !comparison && !useWebSearch) {
       response = await retryCompletion(response, signal, async () => {
@@ -415,18 +433,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (!response.ok) {
+      if(paidChoice && response.status>=400 && response.status<500) await settle(0);
       await response.body?.cancel().catch(() => {});
       if (response.status === 429) {
         const wait = retryAfterSeconds(response.headers.get("retry-after"));
         return NextResponse.json(
-          {error:"Ücretsiz AI sağlayıcısının ortak hız veya kullanım sınırına ulaşıldı. Daha sonra tekrar dene."},
+          {error:"AI sağlayıcısının kullanım sınırına ulaşıldı. Daha sonra tekrar dene."},
           {status:429,headers:{"Cache-Control":"no-store",...(wait ? {"Retry-After":wait} : {})}}
         );
       }
       const message = response.status === 401
         ? "AI sağlayıcısına bağlanılamadı."
         : response.status === 402
-        ? "AI sağlayıcısının hesap veya kredi sınırı nedeniyle ücretsiz istek tamamlanamadı. Ücretli modele geçilmedi."
+        ? "AI sağlayıcısının hesap bakiyesi veya kullanım sınırı nedeniyle istek tamamlanamadı."
         : `AI sağlayıcı hatası (${response.status}).`;
       return NextResponse.json({ error: message }, { status: 502, headers:{"Cache-Control":"no-store"} });
     }
@@ -538,6 +557,10 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = await response.json().catch(() => ({}));
+    if(paidChoice){
+      const cost=reportedCost(payload?.usage);
+      if(cost !== undefined) await settle(cost);
+    }
     const choice = payload?.choices?.[0];
     const reply = String(choice?.message?.content || "").trim();
     await writeUsageLog({
@@ -563,3 +586,4 @@ export async function POST(req: NextRequest) {
     return fail("Beklenmeyen sunucu hatası oluştu.", 500);
   }
 }
+
