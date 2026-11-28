@@ -1032,6 +1032,7 @@ export default function Home() {
           />
 
           <Composer
+            accountId={userId}
             input={input}
             onInputChange={setInput}
             onSubmit={submitComposer}

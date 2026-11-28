@@ -101,7 +101,16 @@ try {
   await page.getByLabel("Araştırma konusu").fill("Örnek konu");
   await page.getByRole("button", {name:"Kaynakları ara"}).click();
   await page.getByRole("link", {name:"Örnek kaynak"}).waitFor();
-  await page.getByRole("button", {name:"Kapat",exact:true}).click();
+  await page.getByRole("button", {name:"Workspace’te aç"}).click();
+  await page.waitForURL(base + "/workspace");
+  const researchDocument = page.getByLabel("Dosya içeriği");
+  await researchDocument.waitFor();
+  const documentText = await researchDocument.inputValue();
+  assert.match(documentText, /Örnek konu/);
+  assert.match(documentText, /Örnek kaynak\nhttps:\/\/tr\.wikipedia\.org\/\?curid=1\nKaynak özeti/);
+  assert.equal(await page.evaluate(() => sessionStorage.getItem("nexus_pending_research")), null);
+  await page.goto(base + "/");
+  await page.getByText("fixture-visible", {exact:true}).waitFor();
   const modelPicker = page.getByRole("button", { name: /^Model seç:/ });
   for (const width of [1280, 320]) {
     await page.setViewportSize({ width, height: 740 });

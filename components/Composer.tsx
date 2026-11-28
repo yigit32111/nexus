@@ -20,6 +20,7 @@ import { bytesLabel } from "../lib/nexus-utils";
 import { ChatResearch } from "./ChatResearch";
 
 type ComposerProps = {
+  accountId: string;
   input: string;
   onInputChange: (val: string) => void;
   onSubmit: () => void;
@@ -47,6 +48,7 @@ type ComposerProps = {
 };
 
 export function Composer({
+  accountId,
   input,
   onInputChange,
   onSubmit,
@@ -230,7 +232,7 @@ export function Composer({
           </div>
         </div>
         <div className="composer-modes">
-          <ChatResearch draft={input} disabled={busy} />
+          <ChatResearch draft={input} disabled={busy} accountId={accountId} />
           <button type="button" className="composer-tool-toggle" aria-pressed={deepThinking}
             disabled={busy} onClick={onToggleDeepThinking}>
             <Brain size={15} aria-hidden="true" /> Derin düşünme
