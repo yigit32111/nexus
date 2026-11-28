@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chatResearchQuery, formatChatResearch, rankResearchResults, readLiverpoolArchive, searchChatWeb } from "../lib/core/chat-web-research.ts";
+import { chatResearchRequest, formatChatResearch, rankResearchResults, readLiverpoolArchive, searchChatWeb } from "../lib/core/chat-web-research.ts";
+
+const chatResearchQuery = (messages) => chatResearchRequest(messages)?.query ?? null;
 
 test("explicit web requests resolve short follow-ups from user turns only", () => {
   const messages = [
@@ -22,7 +24,38 @@ test("Fenerbahçe Liverpool match questions search without a keyword and carry t
   assert.equal(chatResearchQuery([question, { role: "assistant", content: "Maç hangi yıl?" },
     { role: "user", content: "2026 daki maç" }]), "Fenerbahçe Liverpool 2026");
   assert.equal(chatResearchQuery([question, { role: "user", content: "2026 3-2" }]), "Fenerbahçe Liverpool 2026");
-  assert.equal(chatResearchQuery([{ role: "user", content: "2026 daki maç" }]), null);
+  assert.equal(chatResearchQuery([{ role: "user", content: "2026 daki maç" }]), "");
+});
+
+test("unlisted teams and current news trigger topic-specific research without an explicit web command", () => {
+  const ask = content => chatResearchRequest([{ role: "user", content }]);
+  assert.deepEqual(ask("Galatasaray Aston Villa maçı kaç kaç bitti?"), { topic: "match", query: "Galatasaray Aston Villa" });
+  assert.equal(ask("Samsunspor'un güncel kadrosu")?.topic, "squad");
+  assert.equal(ask("Trabzonspor transfer haberleri")?.topic, "transfer");
+  assert.equal(ask("İzmir'de bugün ne oldu?")?.topic, "news");
+  assert.equal(ask("Bu dizinin oyuncu kadrosu üzerine bir hikâye yaz."), null);
+});
+
+test("topic search accepts an approved publisher from the news index and rejects lookalikes", async () => {
+  const calls = [];
+  const xmlItem = (publisher, id, label) => `<item><title>Galatasaray Aston Villa ${label}</title>
+    <link>https://news.google.com/rss/articles/${id}</link>
+    <source url="https://${publisher}">Kaynak</source><pubDate>Tue, 24 Nov 2026 19:10:25 GMT</pubDate></item>`;
+  const results = await searchChatWeb("Galatasaray Aston Villa", new AbortController().signal, async input => {
+    const url = new URL(input);
+    calls.push(url);
+    if (url.hostname === "news.google.com") {
+      return new Response(xmlItem("www.mackolik.com", "valid_article", "maç sonucu")
+        + xmlItem("mackolik.com.example.org", "wrong_host", "maç sonucu")
+        + xmlItem("www.mackolik.com", "wrong_team", "U19 maç sonucu"));
+    }
+    return Response.json({});
+  }, "match");
+  assert.deepEqual(results.map(result => result.url), ["https://news.google.com/rss/articles/valid_article"]);
+  assert.match(formatChatResearch(results), /mackolik\.com · 2026-11-24/);
+  assert.ok(calls.find(url => url.hostname === "news.google.com").searchParams.get("q").includes("site:mackolik.com"));
+  assert.ok(calls.find(url => url.hostname === "api.gdeltproject.org").searchParams.get("query").includes("domainis:uefa.com"));
+  assert.equal(calls.some(url => url.hostname.endsWith("mackolik.com")), false);
 });
 
 test("official matches rank above reports and unverifiable or unrelated hosts are discarded", () => {

@@ -4,9 +4,9 @@ import { extractPdfText, PDF_PAGE_LIMIT } from "../../../lib/core/pdf-text";
 import { asksForDeveloper, DEVELOPER_CREDIT, developerCreditResponse } from "../../../lib/core/developer-credit";
 import { selectPdfContext, type PdfText } from "../../../lib/core/pdf-context";
 import { fetchUntilHeaders, retryCompletion } from "../../../lib/core/provider-timeout";
-import { chatResearchQuery, formatChatResearch, searchChatWeb } from "../../../lib/core/chat-web-research";
+import { chatResearchRequest, formatChatResearch, searchChatWeb } from "../../../lib/core/chat-web-research";
 import { localChatResponse } from "../../../lib/core/local-chat-response";
-import { asksForCurrentFenerbahceSquad, readFenerbahceSquadResponse } from "../../../lib/core/fenerbahce-squad";
+import { discoverUefaSquad } from "../../../lib/core/uefa-squad";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 import { writeUsageLog } from "../../../utils/supabase/admin";
@@ -135,15 +135,15 @@ export async function POST(req: NextRequest) {
       return developerCreditResponse(body.stream !== false);
     }
     if (!attachments.length && body.comparison !== true) {
-      if (asksForCurrentFenerbahceSquad(latestUserQuery) && lastUserIndex === messages.length - 1) {
+      const research = chatResearchRequest(messages);
+      if (research) {
+        if (!research.query) return localChatResponse("Webde aramam için kişisel bilgi içermeyen kısa bir konu yaz.", body.stream !== false);
         if (!await reserveRequest(user.id, "chat", 0)) return fail("Günlük araştırma kotası doldu.", 429);
-        return localChatResponse(await readFenerbahceSquadResponse(req.signal), body.stream !== false);
-      }
-      const query = chatResearchQuery(messages);
-      if (query !== null) {
-        if (!query) return localChatResponse("Webde aramam için kişisel bilgi içermeyen kısa bir konu yaz.", body.stream !== false);
-        if (!await reserveRequest(user.id, "chat", 0)) return fail("Günlük araştırma kotası doldu.", 429);
-        const sources = await searchChatWeb(query, req.signal);
+        if (research.topic === "squad") {
+          const roster = await discoverUefaSquad(research.query, req.signal);
+          if (roster) return localChatResponse(roster, body.stream !== false);
+        }
+        const sources = await searchChatWeb(research.query, req.signal, fetch, research.topic);
         return localChatResponse(formatChatResearch(sources), body.stream !== false);
       }
     }
