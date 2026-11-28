@@ -1,3 +1,5 @@
+import { localChatResponse } from "./local-chat-response.ts";
+
 export const DEVELOPER_CREDIT =
   "NEXUS AI’ın ana geliştiricisi Yiğit Yumak, yardımcı geliştiricisi İsmet Berat Karakülah.";
 
@@ -10,10 +12,5 @@ export function asksForDeveloper(question: string): boolean {
 }
 
 export function developerCreditResponse(stream: boolean): Response {
-  const headers = { "Cache-Control": "no-store" };
-  if (!stream) return Response.json({ reply: DEVELOPER_CREDIT }, { headers });
-  const frame = JSON.stringify({ type: "content", text: DEVELOPER_CREDIT });
-  return new Response(`data: ${frame}\n\ndata: [DONE]\n\n`, {
-    headers: { ...headers, "Content-Type": "text/event-stream; charset=utf-8" },
-  });
+  return localChatResponse(DEVELOPER_CREDIT, stream);
 }
