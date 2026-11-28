@@ -5,6 +5,7 @@ import {createClient} from "../../utils/supabase/client";
 import {CodeLab} from "../../components/CodeLab";
 import {InteractiveChart} from "../../components/InteractiveChart";
 import {WorkspaceAssist} from "../../components/WorkspaceAssist";
+import { RESEARCH_TRANSFER_KEY, RESEARCH_TRANSFER_LIMIT } from "../../lib/workspace/research-transfer";
 type Project={id:string;name:string;instructions:string;notes:string};
 type Source={title:string;text:string;url:string;lang:string};
 export default function Workspace(){
@@ -14,7 +15,52 @@ export default function Workspace(){
  const [scope,setScope]=useState<"all"|"academic">("all");
  const [query,setQuery]=useState(""),[sources,setSources]=useState<Source[]>([]),[research,setResearch]=useState(""),[coverage,setCoverage]=useState("");
  const [artifact,setArtifact]=useState(""),[format,setFormat]=useState("docx"),[chart,setChart]=useState('{"title":"Örnek grafik","bars":[{"label":"A","value":15},{"label":"B","value":25}]}');
- useEffect(()=>{let live=true;void(async()=>{const {data:{user}}=await db.auth.getUser();if(!live)return;if(!user){window.location.replace("/login");return}setUid(user.id);const r=await db.from("nexus_projects").select("id,name,instructions,notes").eq("user_id",user.id).order("created_at",{ascending:false}).limit(100);if(!live)return;if(r.error)setError("Projeler yüklenemedi.");else setProjects(r.data||[]);})();return()=>{live=false}},[db]);
+ useEffect(() => {
+   let live = true;
+   let accountId: string | undefined;
+   const { data: { subscription } } = db.auth.onAuthStateChange((event, session) => {
+     if (!live || event === "INITIAL_SESSION") return;
+     if (event !== "SIGNED_OUT" && (!accountId || session?.user.id === accountId)) return;
+     live = false;
+     setUid("");
+     setArtifact("");
+     window.location.replace(session ? "/workspace" : "/login");
+   });
+   void (async () => {
+     const { data: { user }, error } = await db.auth.getUser();
+     if (!live) return;
+     if (error || !user) {
+       window.location.replace("/login");
+       return;
+     }
+     accountId = user.id;
+     setUid(user.id);
+     try {
+       const raw = sessionStorage.getItem(RESEARCH_TRANSFER_KEY);
+       if (raw) {
+         sessionStorage.removeItem(RESEARCH_TRANSFER_KEY);
+         const transfer = JSON.parse(raw);
+         if (transfer?.accountId === user.id && typeof transfer.text === "string" &&
+             transfer.text.length <= RESEARCH_TRANSFER_LIMIT && !transfer.text.includes("\0")) {
+           setArtifact(transfer.text);
+           setFormat("txt");
+           setTab("files");
+         }
+       }
+     } catch {
+       setError("Araştırma aktarımı okunamadı.");
+     }
+     const result = await db.from("nexus_projects").select("id,name,instructions,notes")
+       .eq("user_id", user.id).order("created_at", { ascending: false }).limit(100);
+     if (!live) return;
+     if (result.error) setError("Projeler yüklenemedi.");
+     else setProjects(result.data || []);
+   })();
+   return () => {
+     live = false;
+     subscription.unsubscribe();
+   };
+ }, [db]);
  function choose(v:string){setSelected(v);const p=projects.find(x=>x.id===v);setName(p?.name||"");setInstructions(p?.instructions||"");setNotes(p?.notes||"");}
  async function save(){if(!uid||!name.trim())return;setBusy(true);setError("");try{const values={name:name.trim().slice(0,100),instructions:instructions.slice(0,4000),notes:notes.slice(0,20000)};const r=selected?await db.from("nexus_projects").update(values).eq("id",selected).eq("user_id",uid).select("id,name,instructions,notes").single():await db.from("nexus_projects").insert({...values,user_id:uid}).select("id,name,instructions,notes").single();if(r.error||!r.data)throw Error("Proje kaydedilemedi");setProjects(old=>[r.data,...old.filter(x=>x.id!==r.data.id)]);setSelected(r.data.id)}catch(e){setError("Proje kaydedilemedi.")}finally{setBusy(false)}}
  async function search(){setBusy(true);setError("");setSources([]);setResearch("");setCoverage("");try{const r=await fetch("/api/research",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query,scope})});const d=await r.json();if(!r.ok)throw Error(d.error);setSources(d.sources||[]);setCoverage(String(d.coverage||"")+(Array.isArray(d.unavailable)&&d.unavailable.length?" Erişilemeyen: "+d.unavailable.join(", "):""))}catch(e){setError(e instanceof Error?e.message:"Araştırma başarısız.")}finally{setBusy(false)}}
